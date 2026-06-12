@@ -1,0 +1,34 @@
+{
+  "name": "sag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted agent worker — skill runner with Conservice as first skill",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "tsc",
+    "worker": "tsx src/main.ts",
+    "worker:once": "tsx src/main.ts --once",
+    "test:conservice": "tsx src/scripts/test-conservice.ts",
+    "test:morning": "tsx src/scripts/test-morning.ts",
+    "test:heartbeat": "tsx src/scripts/test-heartbeat.ts",
+    "test:telegram": "tsx src/scripts/test-telegram.ts",
+    "telegram:chat-id": "tsx src/scripts/telegram-chat-id.ts",
+    "auth:gmail": "tsx src/scripts/gmail-auth.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

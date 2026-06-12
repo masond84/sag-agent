@@ -1,0 +1,12 @@
+id: conservice-statement
+name: Conservice Statement
+enabled: true
+kind: email
+
+trigger:
+  from: ebill@conservicemail.com
+  subjectContains: Monthly Conservice Statement
+  gmailQuery: 'from:conservicemail.com subject:"Monthly Conservice Statement"'
+
+notify:
+  prefix: Conservice bill ready

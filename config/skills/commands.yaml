@@ -1,0 +1,4 @@
+id: telegram-commands
+name: Telegram Assistant
+enabled: true
+kind: interactive

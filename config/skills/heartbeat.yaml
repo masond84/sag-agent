@@ -1,0 +1,10 @@
+id: heartbeat
+name: Heartbeat
+enabled: true
+kind: scheduled
+
+schedule:
+  # Daily alive report and stale threshold (override via .env for testing).
+  reportIntervalMs: 86400000
+  staleAfterMs: 86400000
+  alertCooldownMs: 86400000

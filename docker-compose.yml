@@ -1,0 +1,10 @@
+services:
+  sag-worker:
+    build: .
+    container_name: sag-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    # Pi 3 has limited RAM; no special constraints needed for a lightweight poller.
