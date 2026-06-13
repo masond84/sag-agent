@@ -1,6 +1,6 @@
 id: morning-briefing
 name: Morning Briefing
-enabled: true
+enabled: false
 kind: scheduled
 
 schedule:

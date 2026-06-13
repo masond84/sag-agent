@@ -1,3 +1,4 @@
+import { formatTodayFocusSummary, getTodayFocusDay } from "../focus.js";
 import { compareToPrevious, formatBillSummary, getBillHistory, getLatestBill } from "../bills.js";
 import { formatHealthAudit } from "../health-audit.js";
 import type { ToolDefinition } from "../llm.js";
@@ -28,6 +29,11 @@ export const assistantTools: ToolDefinition[] = [
   {
     name: "list_active_skills",
     description: "List all active SAG skills.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "get_today_focus",
+    description: "Get today's daily focus, check-in history, and whether focus has been set.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
@@ -66,6 +72,11 @@ export async function executeAssistantTool(
 
     case "list_active_skills":
       return context.skills.map((skill) => `- ${skill.name} (${skill.kind})`).join("\n") || "No skills loaded.";
+
+    case "get_today_focus": {
+      const day = await getTodayFocusDay();
+      return formatTodayFocusSummary(day);
+    }
 
     default:
       return `Unknown tool: ${name}`;

@@ -16,6 +16,7 @@ import { isInteractiveSkillConfig, isScheduledSkillConfig } from "../types.js";
 import { conserviceSkill } from "../skills/conservice/index.js";
 import { heartbeatSkill } from "../skills/heartbeat/index.js";
 import { morningSkill } from "../skills/morning/index.js";
+import { focusCompanionSkill } from "../skills/focus/index.js";
 import { commandsSkill } from "../skills/commands/index.js";
 
 const CONFIG_DIR = path.resolve(process.cwd(), "config/skills");
@@ -27,6 +28,7 @@ const emailSkillFactories: Record<string, () => EmailSkill> = {
 const scheduledSkillFactories: Record<string, () => ScheduledSkill> = {
   heartbeat: () => heartbeatSkill,
   "morning-briefing": () => morningSkill,
+  "focus-companion": () => focusCompanionSkill,
 };
 
 const interactiveSkillFactories: Record<string, () => InteractiveSkill> = {

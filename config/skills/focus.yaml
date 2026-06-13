@@ -1,0 +1,7 @@
+id: focus-companion
+name: Focus Companion
+enabled: true
+kind: scheduled
+
+# Phase 1: three LLM anchor touchpoints (8 AM, 1 PM, 9 PM).
+# Hourly mode: every hour 8 AM–9 PM (FOCUS_HOURLY=true). Anchors still handle focus nudges.

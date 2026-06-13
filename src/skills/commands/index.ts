@@ -1,6 +1,15 @@
 import { formatHealthAudit } from "../../core/health-audit.js";
 import { respondToAssistantMessage } from "../../core/assistant/respond.js";
 import {
+  clearPendingReplySlot,
+  formatTodayFocusSummary,
+  getPendingReplySlot,
+  getTodayFocusDay,
+  getTodayFocusText,
+  recordTouchpointReply,
+  setTodayFocus,
+} from "../../core/focus.js";
+import {
   ensureTelegramPollingMode,
   fetchTelegramUpdates,
   isAuthorizedChat,
@@ -31,16 +40,31 @@ function formatHelp(): string {
     "Talk naturally, for example:",
     "- What was my last utility bill?",
     "- Is SAG healthy?",
-    "- Help me plan my day",
+    "- What's my focus today?",
     "",
-    "Each morning (~7:30 AM) SAG sends a good morning message.",
+    "Daily companion (hourly 8 AM–9 PM, LLM): check-ins and focus tracking.",
+    "Set focus: /focus followed by your goal (e.g. /focus Ship the PR)",
     "",
     "Commands:",
     "/ping — check if SAG is online",
     "/status — full health audit",
     "/skills — list active skills",
+    "/focus — show today's focus",
     "/help — show this message",
   ].join("\n");
+}
+
+async function handleFocusCommand(text: string): Promise<string> {
+  const trimmed = text.trim();
+  const rest = trimmed.slice("/focus".length).trim();
+
+  if (!rest) {
+    const day = await getTodayFocusDay();
+    return ["Today's focus", "", formatTodayFocusSummary(day)].join("\n");
+  }
+
+  const day = await setTodayFocus(rest);
+  return `Focus set for today: "${day.focus}"`;
 }
 
 function handleCommand(command: string, context: InteractiveSkillContext): string {
@@ -57,6 +81,32 @@ function handleCommand(command: string, context: InteractiveSkillContext): strin
     default:
       return [`Unknown command: ${command}`, "", formatHelp()].join("\n");
   }
+}
+
+async function buildReply(text: string, context: InteractiveSkillContext): Promise<string> {
+  const command = parseCommand(text);
+
+  if (command === "/focus") {
+    return handleFocusCommand(text);
+  }
+
+  if (command) {
+    return handleCommand(command, context);
+  }
+
+  const pendingSlot = await getPendingReplySlot();
+  if (pendingSlot) {
+    await recordTouchpointReply(pendingSlot, text);
+    await clearPendingReplySlot();
+
+    const focus = await getTodayFocusText();
+    if (focus) {
+      return `Noted — thanks for the check-in on "${focus}".`;
+    }
+    return "Noted — thanks for the check-in.";
+  }
+
+  return respondToAssistantMessage(text, context);
 }
 
 export const commandsSkill: InteractiveSkill = {
@@ -94,8 +144,7 @@ export const commandsSkill: InteractiveSkill = {
         continue;
       }
 
-      const command = parseCommand(text);
-      const reply = command ? handleCommand(command, context) : await respondToAssistantMessage(text, context);
+      const reply = await buildReply(text, context);
       await sendTelegramMessage(chatId, reply);
     }
 
