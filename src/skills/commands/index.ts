@@ -1,6 +1,15 @@
 import { buildCheckInReplyNudge } from "../../core/companion-message.js";
 import { formatHealthAudit } from "../../core/health-audit.js";
+import { shouldUseCheckInNudge, isGeneralConversation } from "../../core/message-routing.js";
 import { respondToAssistantMessage } from "../../core/assistant/respond.js";
+import { formatSkillCatalog } from "../../core/skill-catalog.js";
+import { clearConversation } from "../../core/memory/conversation.js";
+import {
+  addExplicitMemory,
+  listUserMemories,
+  resolveMemoryUserId,
+} from "../../core/memory/mem0-service.js";
+import { formatProfileSummary, loadAgentProfile } from "../../core/memory/profile.js";
 import {
   clearPendingReplySlot,
   formatTodayFocusSummary,
@@ -21,17 +30,7 @@ import { getTelegramUpdateOffset, setTelegramUpdateOffset } from "../../core/sta
 import type { InteractiveSkill, InteractiveSkillContext } from "../../types.js";
 
 function formatSkillsList(context: InteractiveSkillContext): string {
-  const lines = ["Active skills:"];
-
-  for (const skill of context.skills) {
-    lines.push(`- ${skill.name} (${skill.kind})`);
-  }
-
-  if (context.skills.length === 0) {
-    lines.push("- none");
-  }
-
-  return lines.join("\n");
+  return formatSkillCatalog(context.skills);
 }
 
 function formatHelp(): string {
@@ -39,9 +38,10 @@ function formatHelp(): string {
     "SAG assistant",
     "",
     "Talk naturally, for example:",
+    "- Hey — just saying hi",
+    "- What skills can you run?",
     "- What was my last utility bill?",
-    "- Is SAG healthy?",
-    "- What's my focus today?",
+    "- I'm bored, want to chat",
     "",
     "Daily companion: check-ins and focus tracking. Reply to a check-in for an immediate nudge.",
     "Set focus: /focus followed by your goal (e.g. /focus Ship the PR)",
@@ -51,6 +51,10 @@ function formatHelp(): string {
     "/status — full health audit",
     "/skills — list active skills",
     "/focus — show today's focus",
+    "/profile — show your stable profile",
+    "/remember <fact> — save a fact to Mem0",
+    "/memories — list stored Mem0 memories",
+    "/clear — clear this chat's short-term thread",
     "/help — show this message",
   ].join("\n");
 }
@@ -68,7 +72,21 @@ async function handleFocusCommand(text: string): Promise<string> {
   return `Focus set for today: "${day.focus}"`;
 }
 
-function handleCommand(command: string, context: InteractiveSkillContext): string {
+async function handleRememberCommand(text: string, memoryUserId: string): Promise<string> {
+  const fact = text.trim().slice("/remember".length).trim();
+  if (!fact) {
+    return 'Usage: /remember followed by a fact (e.g. /remember I prefer React over Vue)';
+  }
+
+  await addExplicitMemory(memoryUserId, fact);
+  return `Got it — I'll remember: "${fact}"`;
+}
+
+async function handleCommand(
+  command: string,
+  context: InteractiveSkillContext,
+  memoryUserId: string,
+): Promise<string> {
   switch (command) {
     case "/ping":
       return "SAG online";
@@ -76,6 +94,13 @@ function handleCommand(command: string, context: InteractiveSkillContext): strin
       return ["SAG status", "", formatHealthAudit(context.health)].join("\n");
     case "/skills":
       return formatSkillsList(context);
+    case "/profile":
+      return formatProfileSummary(await loadAgentProfile());
+    case "/memories":
+      return listUserMemories(memoryUserId);
+    case "/clear":
+      await clearConversation(memoryUserId);
+      return "Cleared this chat's short-term conversation thread.";
     case "/help":
     case "/start":
       return formatHelp();
@@ -84,25 +109,42 @@ function handleCommand(command: string, context: InteractiveSkillContext): strin
   }
 }
 
-async function buildReply(text: string, context: InteractiveSkillContext): Promise<string> {
+async function buildReply(
+  text: string,
+  context: InteractiveSkillContext,
+  chatId: number,
+): Promise<string> {
   const command = parseCommand(text);
+  const memoryUserId = resolveMemoryUserId(chatId);
 
   if (command === "/focus") {
     return handleFocusCommand(text);
   }
 
+  if (command === "/remember") {
+    return handleRememberCommand(text, memoryUserId);
+  }
+
   if (command) {
-    return handleCommand(command, context);
+    return await handleCommand(command, context, memoryUserId);
   }
 
   const pendingSlot = await getPendingReplySlot();
-  if (pendingSlot) {
-    await recordTouchpointReply(pendingSlot, text);
+
+  if (shouldUseCheckInNudge(text, pendingSlot)) {
+    await recordTouchpointReply(pendingSlot!, text);
     await clearPendingReplySlot();
-    return buildCheckInReplyNudge(text, pendingSlot, getFocusTimeZone());
+    return buildCheckInReplyNudge(text, pendingSlot!, getFocusTimeZone());
   }
 
-  return respondToAssistantMessage(text, context);
+  if (pendingSlot && isGeneralConversation(text)) {
+    await clearPendingReplySlot();
+  }
+
+  return respondToAssistantMessage(text, context, {
+    pendingCheckInSlot: pendingSlot && !isGeneralConversation(text) ? pendingSlot : undefined,
+    memoryUserId,
+  });
 }
 
 export const commandsSkill: InteractiveSkill = {
@@ -140,7 +182,7 @@ export const commandsSkill: InteractiveSkill = {
         continue;
       }
 
-      const reply = await buildReply(text, context);
+      const reply = await buildReply(text, context, chatId);
       await sendTelegramMessage(chatId, reply);
     }
 

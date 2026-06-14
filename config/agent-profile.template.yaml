@@ -1,0 +1,20 @@
+# Copy to data/profile.yaml and customize. Loaded into every assistant turn and seeded to Mem0.
+profileVersion: 1
+
+identity:
+  name: Your Name
+  role: e.g. Freelance developer / consultant
+  business: e.g. Independent software work
+
+communication:
+  tone: direct, warm, practical
+  default_length: short unless drafting documents
+
+work:
+  default_project_root: ~/Projects/clients
+  spec_style: |
+    Executive summary, scope, out of scope, timeline, tech assumptions, open questions.
+
+preferences:
+  timezone: America/New_York
+  confirm_before_file_writes: true

@@ -14,6 +14,7 @@
     "test:morning": "tsx src/scripts/test-morning.ts",
     "test:heartbeat": "tsx src/scripts/test-heartbeat.ts",
     "test:focus": "tsx src/scripts/test-focus.ts",
+    "test:memory": "tsx src/scripts/test-memory.ts",
     "test:telegram": "tsx src/scripts/test-telegram.ts",
     "telegram:chat-id": "tsx src/scripts/telegram-chat-id.ts",
     "auth:gmail": "tsx src/scripts/gmail-auth.ts",
@@ -29,6 +30,7 @@
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
+    "mem0ai": "^3.0.8",
     "yaml": "^2.7.0"
   },
   "devDependencies": {

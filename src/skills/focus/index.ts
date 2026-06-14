@@ -99,7 +99,10 @@ async function runFocusCompanion(_context: AgentHealthContext): Promise<Schedule
   const message = await buildCompanionMessage(intent, slot, timeZone);
 
   await markTouchpointSent(slot, timeZone);
-  await setPendingReplySlot(slot);
+
+  if (anchorHours.includes(currentHour)) {
+    await setPendingReplySlot(slot);
+  }
 
   return {
     type: "briefing",

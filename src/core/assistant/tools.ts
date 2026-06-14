@@ -1,5 +1,6 @@
 import { formatTodayFocusSummary, getTodayFocusDay } from "../focus.js";
 import { compareToPrevious, formatBillSummary, getBillHistory, getLatestBill } from "../bills.js";
+import { formatSkillCatalogForAssistant } from "../skill-catalog.js";
 import { formatHealthAudit } from "../health-audit.js";
 import type { ToolDefinition } from "../llm.js";
 import type { InteractiveSkillContext } from "../../types.js";
@@ -28,7 +29,8 @@ export const assistantTools: ToolDefinition[] = [
   },
   {
     name: "list_active_skills",
-    description: "List all active SAG skills.",
+    description:
+      "List all active SAG skills with what each one does. Use when the user asks what you can do, what skills exist, or what SAG has access to.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -71,7 +73,7 @@ export async function executeAssistantTool(
     }
 
     case "list_active_skills":
-      return context.skills.map((skill) => `- ${skill.name} (${skill.kind})`).join("\n") || "No skills loaded.";
+      return formatSkillCatalogForAssistant(context.skills);
 
     case "get_today_focus": {
       const day = await getTodayFocusDay();
