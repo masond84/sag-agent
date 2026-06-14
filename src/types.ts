@@ -77,6 +77,7 @@ export interface AgentHealthContext {
   gmailConfigured: boolean;
   telegramConfigured: boolean;
   dryRun: boolean;
+  skills: SkillSummary[];
 }
 
 export interface SkillSummary {

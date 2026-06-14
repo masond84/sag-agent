@@ -1,6 +1,5 @@
 import type { AgentHealthContext, ScheduledSkill, ScheduledSkillResult } from "../../types.js";
-import { formatHealthAudit } from "../../core/health-audit.js";
-import { formatRelativeTime } from "../../core/health.js";
+import { buildAliveReportMessage, buildRecoveryMessage } from "../../core/heartbeat-message.js";
 import {
   getLastHeartbeatReportAt,
   getLastWatchdogAlertAt,
@@ -57,14 +56,7 @@ async function runHeartbeat(context: AgentHealthContext): Promise<ScheduledSkill
 
     return {
       type: "alert",
-      message: [
-        "SAG alert — worker was stale",
-        "",
-        `Last check before recovery: ${formatRelativeTime(context.previousLastRunAt)}`,
-        "Worker is back online now.",
-        "",
-        formatHealthAudit(context),
-      ].join("\n"),
+      message: await buildRecoveryMessage(context),
     };
   }
 
@@ -76,7 +68,7 @@ async function runHeartbeat(context: AgentHealthContext): Promise<ScheduledSkill
 
   return {
     type: "report",
-    message: ["SAG alive", "", formatHealthAudit(context)].join("\n"),
+    message: await buildAliveReportMessage(context),
   };
 }
 

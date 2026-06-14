@@ -133,11 +133,19 @@ export async function buildHealthContext(
     gmailConfigured: isGmailConfigured(),
     telegramConfigured: isTelegramConfigured(),
     dryRun: config.dryRun,
+    skills: summarizeSkills(skills),
   };
 }
 
 export async function runWorkerCycle(skills: LoadedSkills, config: WorkerConfig): Promise<void> {
   const healthContext = await buildHealthContext(skills, config);
+  const heartbeat = skills.scheduled.find((skill) => skill.config.id === "heartbeat");
+  const otherScheduled = skills.scheduled.filter((skill) => skill.config.id !== "heartbeat");
+
+  if (heartbeat) {
+    await processScheduledSkill(heartbeat, healthContext, config);
+  }
+
   await touchWorkerRun();
 
   await processInteractiveSkills(skills, healthContext);
@@ -153,7 +161,7 @@ export async function runWorkerCycle(skills: LoadedSkills, config: WorkerConfig)
     );
   }
 
-  for (const skill of skills.scheduled) {
+  for (const skill of otherScheduled) {
     await processScheduledSkill(skill, healthContext, config);
   }
 }

@@ -42,7 +42,31 @@ function buildTemplate(context: CompanionMessageContext): string {
   }
 }
 
-async function runShortLlmCompletion(system: string, user: string): Promise<string> {
+function buildCheckInReplyFallback(focus: string | undefined, userReply: string): string {
+  const lower = userReply.toLowerCase();
+
+  if (/\b(done|finished|complete|shipped|wrapped)\b/.test(lower)) {
+    return focus
+      ? `Nice work on "${focus}". Take a moment to note what worked, then decide if anything's left for today.`
+      : "Nice — take a moment to note what worked, then decide if anything's left for today.";
+  }
+
+  if (/\b(stuck|blocked|struggling|hard|overwhelm|confus)/.test(lower)) {
+    return focus
+      ? `On "${focus}" — pick one 5-minute step you can do right now. Start there; momentum beats perfect plans.`
+      : "Pick one 5-minute step you can do right now. Start there; momentum beats perfect plans.";
+  }
+
+  if (/\b(busy|heads down|later|not now|don't bother|do not bother)\b/.test(lower)) {
+    return "Got it — I'll stay quiet unless you message me. Ping me when you want a nudge.";
+  }
+
+  return focus
+    ? `On "${focus}" — what's the single smallest next step you could do in the next 10 minutes?`
+    : "What's the single smallest next step you could do in the next 10 minutes?";
+}
+
+async function runShortLlmCompletion(system: string, user: string, maxTokens = 100): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
@@ -59,7 +83,7 @@ async function runShortLlmCompletion(system: string, user: string): Promise<stri
     },
     body: JSON.stringify({
       model,
-      max_tokens: 100,
+      max_tokens: maxTokens,
       temperature: 0.7,
       messages: [
         { role: "system", content: system },
@@ -125,6 +149,12 @@ export async function buildCompanionMessage(
     systemParts.push("You may briefly reference their focus.");
   }
 
+  if (context.recentReplies.length > 0) {
+    systemParts.push(
+      "The user already replied to earlier check-ins today. Briefly reference their last reply and ask a specific follow-up — do not repeat the same generic question.",
+    );
+  }
+
   const system = systemParts.join(" ");
 
   const user = [
@@ -144,6 +174,53 @@ export async function buildCompanionMessage(
     return await runShortLlmCompletion(system, user);
   } catch {
     return template;
+  }
+}
+
+export async function buildCheckInReplyNudge(
+  userReply: string,
+  slot: string,
+  timeZone: string,
+): Promise<string> {
+  const trimmed = userReply.trim();
+  const day = await getTodayFocusDay(timeZone);
+  const focus = day.focus?.trim();
+  const priorReplies = getRecentCheckInReplies(day, 5).filter((reply) => reply !== trimmed);
+  const now = getZonedTimeInfo(timeZone);
+  const fallback = buildCheckInReplyFallback(focus, trimmed);
+
+  if (!isLlmConfigured()) {
+    return fallback;
+  }
+
+  const system = [
+    "You are SAG, a personal focus companion on Telegram.",
+    "The user just replied to your check-in. Respond immediately with practical guidance — not a generic thank-you.",
+    "Give ONE concrete nudge: a specific next step, a reframe, or brief encouragement tied to what they said.",
+    "Keep it to 1-3 sentences, under 320 characters. No markdown, no bullet lists.",
+    "If they say they are done, congratulate briefly and suggest closing the loop.",
+    "If they are stuck, suggest one tiny actionable step they could do in the next 10 minutes.",
+    "If they want to be left alone, acknowledge and back off.",
+    "Do not invent facts about bills, email, or devices.",
+  ].join(" ");
+
+  const user = [
+    `Check-in slot: ${slot}`,
+    `Weekday: ${now.weekday}`,
+    `Hour: ${now.hour}`,
+    `Focus: ${focus ?? "not set"}`,
+    priorReplies.length > 0 ? `Earlier replies today: ${priorReplies.join(" | ")}` : "",
+    `User reply: ${trimmed}`,
+    `Fallback if unsure: ${fallback}`,
+    "Write the Telegram reply only.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    return await runShortLlmCompletion(system, user, 150);
+  } catch {
+    return fallback;
   }
 }
 

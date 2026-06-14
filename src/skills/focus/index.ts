@@ -82,33 +82,30 @@ async function runFocusCompanion(_context: AgentHealthContext): Promise<Schedule
     return null;
   }
 
-  const day = await getTodayFocusDay(timeZone);
-  const hasFocus = Boolean(await getTodayFocusText(timeZone));
-
-  for (const hour of companionHours) {
-    if (now.hour < hour) {
-      continue;
-    }
-
-    const slot = slotForHour(hour);
-    if (hasSentTouchpointToday(day, slot, now.dateKey)) {
-      continue;
-    }
-
-    const intent = resolveCompanionIntent(hour, hasFocus, anchorHours);
-    const message = await buildCompanionMessage(intent, slot, timeZone);
-
-    await markTouchpointSent(slot, timeZone);
-    await setPendingReplySlot(slot);
-
-    return {
-      type: "briefing",
-      bypassDryRun: true,
-      message,
-    };
+  const currentHour = now.hour;
+  if (!companionHours.includes(currentHour)) {
+    return null;
   }
 
-  return null;
+  const day = await getTodayFocusDay(timeZone);
+  const hasFocus = Boolean(await getTodayFocusText(timeZone));
+  const slot = slotForHour(currentHour);
+
+  if (hasSentTouchpointToday(day, slot, now.dateKey)) {
+    return null;
+  }
+
+  const intent = resolveCompanionIntent(currentHour, hasFocus, anchorHours);
+  const message = await buildCompanionMessage(intent, slot, timeZone);
+
+  await markTouchpointSent(slot, timeZone);
+  await setPendingReplySlot(slot);
+
+  return {
+    type: "briefing",
+    bypassDryRun: true,
+    message,
+  };
 }
 
 export const focusCompanionSkill: ScheduledSkill = {

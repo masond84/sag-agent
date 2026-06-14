@@ -1,36 +1,46 @@
 import "dotenv/config";
-import { formatHostLabel, formatRelativeTime, formatStatusLabel } from "../core/health.js";
+import { buildAliveReportMessage, buildRecoveryMessage } from "../core/heartbeat-message.js";
 import { buildHealthContext } from "../core/worker.js";
 import { loadSkills } from "../core/registry.js";
 import { loadWorkerConfig } from "../types.js";
 import { heartbeatSkill } from "../skills/heartbeat/index.js";
 import { getLastHeartbeatReportAt } from "../core/state.js";
 
-function buildPreviewMessage(context: Awaited<ReturnType<typeof buildHealthContext>>): string {
-  const totalSkills =
-    context.emailSkillCount + context.scheduledSkillCount + context.interactiveSkillCount;
-  return [
-    "SAG alive",
-    "",
-    "Health audit:",
-    `- Host: ${formatHostLabel()}`,
-    `- Last check: ${formatRelativeTime(context.previousLastRunAt)}`,
-    `- Active skills: ${totalSkills} (${context.emailSkillCount} email, ${context.scheduledSkillCount} scheduled, ${context.interactiveSkillCount} interactive)`,
-    `- Gmail: ${formatStatusLabel(context.gmailConfigured)}`,
-    `- Telegram: ${formatStatusLabel(context.telegramConfigured)}`,
-    `- Messages processed: ${context.processedMessageCount}`,
-  ].join("\n");
-}
+const STALE_MS = 31 * 60 * 60 * 1000;
 
 async function main(): Promise<void> {
   const force = process.argv.includes("--force");
+  const recovery = process.argv.includes("--recovery");
+  const send = process.argv.includes("--send");
   const skills = await loadSkills();
   const config = loadWorkerConfig();
   const context = await buildHealthContext(skills, config);
+  const previewContext = recovery
+    ? {
+        ...context,
+        previousLastRunAt: new Date(Date.now() - STALE_MS).toISOString(),
+      }
+    : context;
 
-  if (force) {
-    console.log("Force mode: preview only (state not updated).\n");
-    console.log(buildPreviewMessage(context));
+  if (force || recovery) {
+    const message = recovery
+      ? await buildRecoveryMessage(previewContext)
+      : await buildAliveReportMessage(previewContext);
+
+    console.log(`${recovery ? "Recovery" : "Alive report"} preview${force ? " (force)" : ""}:\n`);
+    console.log(message);
+
+    if (send) {
+      const { isTelegramConfigured, sendNotification } = await import("../core/notify.js");
+      if (!isTelegramConfigured()) {
+        console.error("Telegram is not configured.");
+        process.exit(1);
+      }
+
+      await sendNotification(message);
+      console.log("\nSent preview to Telegram.");
+    }
+
     return;
   }
 
@@ -40,7 +50,9 @@ async function main(): Promise<void> {
   const result = await heartbeatSkill.run(context);
   if (!result) {
     console.log("No heartbeat action needed right now.");
-    console.log("Use `npm run test:heartbeat -- --force` to preview the message format.");
+    console.log("Use `npm run test:heartbeat -- --force` to preview the alive report.");
+    console.log("Use `npm run test:heartbeat -- --recovery --force` to preview startup recovery.");
+    console.log("Add `--send` to deliver a preview to Telegram.");
     return;
   }
 

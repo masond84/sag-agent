@@ -1,11 +1,12 @@
+import { buildCheckInReplyNudge } from "../../core/companion-message.js";
 import { formatHealthAudit } from "../../core/health-audit.js";
 import { respondToAssistantMessage } from "../../core/assistant/respond.js";
 import {
   clearPendingReplySlot,
   formatTodayFocusSummary,
+  getFocusTimeZone,
   getPendingReplySlot,
   getTodayFocusDay,
-  getTodayFocusText,
   recordTouchpointReply,
   setTodayFocus,
 } from "../../core/focus.js";
@@ -42,7 +43,7 @@ function formatHelp(): string {
     "- Is SAG healthy?",
     "- What's my focus today?",
     "",
-    "Daily companion (hourly 8 AM–9 PM, LLM): check-ins and focus tracking.",
+    "Daily companion: check-ins and focus tracking. Reply to a check-in for an immediate nudge.",
     "Set focus: /focus followed by your goal (e.g. /focus Ship the PR)",
     "",
     "Commands:",
@@ -98,12 +99,7 @@ async function buildReply(text: string, context: InteractiveSkillContext): Promi
   if (pendingSlot) {
     await recordTouchpointReply(pendingSlot, text);
     await clearPendingReplySlot();
-
-    const focus = await getTodayFocusText();
-    if (focus) {
-      return `Noted — thanks for the check-in on "${focus}".`;
-    }
-    return "Noted — thanks for the check-in.";
+    return buildCheckInReplyNudge(text, pendingSlot, getFocusTimeZone());
   }
 
   return respondToAssistantMessage(text, context);

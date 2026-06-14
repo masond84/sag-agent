@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { buildCompanionMessage, resolveCompanionIntent } from "../core/companion-message.js";
+import { buildCheckInReplyNudge, buildCompanionMessage, resolveCompanionIntent } from "../core/companion-message.js";
 import { getFocusTimeZone, getTodayFocusText } from "../core/focus.js";
 import { getCompanionHours, getFocusAnchorHours } from "../skills/focus/index.js";
 
@@ -19,9 +19,20 @@ async function previewSlot(hour: number, forceHasFocus?: boolean): Promise<void>
 async function main(): Promise<void> {
   const anchorHours = getFocusAnchorHours();
   const slotArg = process.argv.find((arg) => arg.startsWith("--slot="));
+  const replyArg = process.argv.find((arg) => arg.startsWith("--reply="));
   const send = process.argv.includes("--send");
   const withFocus = process.argv.includes("--with-focus");
   const noFocus = process.argv.includes("--no-focus");
+
+  if (replyArg) {
+    const userReply = replyArg.slice("--reply=".length);
+    const slot = slotArg ? `anchor-${slotArg.split("=")[1]}` : "anchor-13";
+    const nudge = await buildCheckInReplyNudge(userReply, slot, getFocusTimeZone());
+    console.log(`--- reply nudge (${slot}) ---`);
+    console.log(`User: ${userReply}`);
+    console.log(nudge);
+    return;
+  }
 
   if (send) {
     const hour = slotArg ? Number(slotArg.split("=")[1]) : anchorHours[0];
@@ -59,6 +70,7 @@ async function main(): Promise<void> {
 
   console.log("Options:");
   console.log("  --slot=8       Preview one anchor hour");
+  console.log('  --reply="..."  Preview immediate nudge after a check-in reply');
   console.log("  --with-focus   Preview as if focus is set");
   console.log("  --no-focus     Preview as if focus is not set");
   console.log("  --send         Deliver --slot message to Telegram (does not update focus.json state)");

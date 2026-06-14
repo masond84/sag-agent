@@ -5,10 +5,10 @@ Self-hosted personal agent that monitors Gmail, sends Telegram alerts, and runs 
 ## What it does
 
 - **Conservice bills** — watches Gmail for utility statements, parses charges, and texts a summary to Telegram
-- **Morning briefing** — sends a daily good morning message at 7:30 AM (configurable)
+- **Focus companion** — hourly LLM check-ins (8 AM–9 PM), `/focus` command, check-in memory
 - **Heartbeat** — optional daily health audit so you know the worker is alive
 - **Telegram assistant** — talk to the bot in natural language; it uses tools to answer from your stored data
-- **Commands** — `/ping`, `/status`, `/skills`, `/help`
+- **Commands** — `/ping`, `/status`, `/skills`, `/focus`, `/help`
 
 ## Architecture
 
@@ -73,6 +73,10 @@ Never commit `.env` or `data/` — they contain secrets and runtime state.
 | `npm run test:conservice` | Test bill parser against fixture |
 | `npm run test:telegram` | Test Telegram send |
 | `npm run test:morning` | Preview morning message (`--send` to deliver) |
+| `npm run test:focus` | Preview focus companion messages |
+| `npm run launchd:install` | Install Mac auto-start (launchd) |
+| `npm run launchd:status` | Check launchd job + recent logs |
+| `npm run launchd:uninstall` | Remove launchd auto-start |
 
 ## Project layout
 
@@ -86,7 +90,66 @@ fixtures/          Sample emails for testing
 
 ## Deployment
 
-Runs on a Mac, Raspberry Pi, or any machine with Node 20+. Docker files are included for optional container deployment.
+### Mac (launchd — recommended)
+
+Keep SAG running after login and restart it if it crashes:
+
+```bash
+npm run build          # once, after code changes
+npm run launchd:install
+```
+
+Stop any manual `npm start` in a terminal first — only one worker should run at a time.
+
+#### Day-to-day workflow
+
+Once installed, launchd keeps the agent running in the background. You do not need `npm run dev` unless you are actively editing and want live reload.
+
+```bash
+# Normal: do nothing — launchd keeps it running
+npm run launchd:status    # check health
+
+# After code changes:
+npm run build             # launchd runs dist/main.js, not src/
+# launchd auto-restarts if the process crashes; for a clean pick-up of new code:
+launchctl kickstart -k "gui/$(id -u)/com.masond84.sag-agent"
+
+# While actively developing (pick ONE):
+npm run launchd:uninstall   # stop background worker
+npm run dev                 # foreground with hot reload
+# when done coding:
+npm run launchd:install     # back to background
+```
+
+```bash
+npm run launchd:status     # job state + tail of logs
+tail -f ~/Library/Logs/sag-agent/stdout.log
+
+npm run launchd:uninstall  # stop and remove
+```
+
+How it is wired:
+
+```
+Login / boot
+  └── launchd (~/Library/LaunchAgents/com.masond84.sag-agent.plist)
+        └── scripts/launchd-run.sh
+              └── node dist/main.js   (loads .env from project root)
+```
+
+Logs: `~/Library/Logs/sag-agent/stdout.log` and `stderr.log`
+
+**Desktop folder:** macOS blocks background agents from `Desktop`, `Documents`, and `Downloads`. If `launchd:status` shows `Operation not permitted`, move the project and reinstall:
+
+```bash
+npm run launchd:relocate    # moves to ~/Projects/sag-agent
+cd ~/Projects/sag-agent
+npm run launchd:install
+```
+
+### Other targets
+
+Runs on a Raspberry Pi or any machine with Node 20+. Docker files are included for optional container deployment.
 
 GitHub Actions can run `npm run worker:once` on a schedule for cloud-based polling (secrets must be configured in the repo).
 
