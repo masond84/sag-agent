@@ -14,6 +14,7 @@ import type {
 } from "../types.js";
 import { isInteractiveSkillConfig, isScheduledSkillConfig } from "../types.js";
 import { conserviceSkill } from "../skills/conservice/index.js";
+import { devRunnerSkill } from "../skills/dev-runner/index.js";
 import { heartbeatSkill } from "../skills/heartbeat/index.js";
 import { morningSkill } from "../skills/morning/index.js";
 import { focusCompanionSkill } from "../skills/focus/index.js";
@@ -27,6 +28,7 @@ const emailSkillFactories: Record<string, () => EmailSkill> = {
 
 const scheduledSkillFactories: Record<string, () => ScheduledSkill> = {
   heartbeat: () => heartbeatSkill,
+  "dev-runner": () => devRunnerSkill,
   "morning-briefing": () => morningSkill,
   "focus-companion": () => focusCompanionSkill,
 };

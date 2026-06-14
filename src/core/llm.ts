@@ -28,61 +28,45 @@ function getBaseUrl(): string {
   return (process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/$/, "");
 }
 
-export async function runAssistantTurn(
+function getMaxTokens(): number {
+  return Number(process.env.ASSISTANT_MAX_TOKENS ?? 400);
+}
+
+function getDevMaxTokens(): number {
+  return Number(process.env.DEV_MAX_TOKENS ?? 2000);
+}
+
+function getDevModel(): string {
+  return process.env.DEV_MODEL?.trim() || getModel();
+}
+
+async function runChatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-): Promise<{
-  message: ChatMessage;
-  toolCalls: Array<{ id: string; name: string; arguments: string }>;
-}> {
+  options?: { maxTokens?: number; model?: string },
+): Promise<{ message: ChatMessage; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const response = await fetch(`${getBaseUrl()}/chat/completions`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: getModel(),
+      model: options?.model ?? getModel(),
+      max_tokens: options?.maxTokens ?? getMaxTokens(),
       messages,
       tools: tools.map((tool) => ({
         type: "function",
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
+        function: { name: tool.name, description: tool.description, parameters: tool.parameters },
       })),
       tool_choice: "auto",
     }),
   });
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`LLM request failed (${response.status}): ${errorBody}`);
-  }
+  if (!response.ok) throw new Error(`LLM request failed (${response.status}): ${await response.text()}`);
 
-  const payload = (await response.json()) as {
-    choices: Array<{
-      message: {
-        role: "assistant";
-        content: string | null;
-        tool_calls?: Array<{
-          id: string;
-          function: { name: string; arguments: string };
-        }>;
-      };
-    }>;
-  };
-
-  const choice = payload.choices[0]?.message;
-  if (!choice) {
-    throw new Error("LLM returned no message");
-  }
+  const choice = ((await response.json()) as { choices: Array<{ message: ChatMessage & { tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }> }).choices[0]?.message;
+  if (!choice) throw new Error("LLM returned no message");
 
   return {
     message: {
@@ -91,17 +75,17 @@ export async function runAssistantTurn(
       tool_calls: choice.tool_calls?.map((call) => ({
         id: call.id,
         type: "function" as const,
-        function: {
-          name: call.function.name,
-          arguments: call.function.arguments,
-        },
+        function: { name: call.function.name, arguments: call.function.arguments },
       })),
     },
-    toolCalls:
-      choice.tool_calls?.map((call) => ({
-        id: call.id,
-        name: call.function.name,
-        arguments: call.function.arguments,
-      })) ?? [],
+    toolCalls: choice.tool_calls?.map((call) => ({ id: call.id, name: call.function.name, arguments: call.function.arguments })) ?? [],
   };
+}
+
+export async function runAssistantTurn(messages: ChatMessage[], tools: ToolDefinition[]) {
+  return runChatCompletion(messages, tools);
+}
+
+export async function runDevTurn(messages: ChatMessage[], tools: ToolDefinition[]) {
+  return runChatCompletion(messages, tools, { maxTokens: getDevMaxTokens(), model: getDevModel() });
 }

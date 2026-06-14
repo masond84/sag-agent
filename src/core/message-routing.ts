@@ -14,7 +14,24 @@ const DATA_QUERY_PATTERN =
   /\b(utility bill|conservice|my bill|last bill|bill history|focus today|today'?s focus|what was my)\b/i;
 
 const CHECK_IN_REPLY_PATTERN =
-  /^(good|fine|ok|okay|great|alright|done|finished|stuck|busy|bad|rough|meh|tired|great|yes|no|yep|nope|nah)\b|\b(stuck|blocked|on track|heads down|making progress|getting there|almost done|wrapped up|finished|overwhelm|struggling)\b|\b(don't bother|do not bother|leave me alone|not now|later)\b/i;
+  /^(good|fine|ok|okay|great|alright|done|finished|stuck|busy|bad|rough|meh|tired|yes|no|yep|nope|nah)\b|\b(stuck|blocked|on track|heads down|making progress|getting there|almost done|wrapped up|finished|overwhelm|struggling)\b/i;
+
+const DEV_TASK_PATTERN =
+  /\b(update (your|the|my) code|change (your|the) (code|prompt|personality|copy)|implement (this|it)|modify (your|the)|fix (your|the)|self.?modif|make you (real|more)|stop saying you'?re (a )?virtual|remove disclaimers?|\/dev\b)/i;
+
+export function isDevTaskRequest(text: string): boolean {
+  return DEV_TASK_PATTERN.test(text.trim());
+}
+
+export function extractDevTask(text: string): string {
+  const trimmed = text.trim();
+  const devRun = trimmed.match(/^\/dev\s+run\s+(.+)/is);
+  if (devRun?.[1]) return devRun[1].trim();
+  return trimmed
+    .replace(/\/?dev\s+(please\s+)?(run\s+|implement\s+)?/gi, "")
+    .replace(/^(you are real\.?\s*)/i, "")
+    .trim() || trimmed;
+}
 
 export function isGeneralConversation(text: string): boolean {
   const normalized = text.trim();
@@ -23,6 +40,10 @@ export function isGeneralConversation(text: string): boolean {
   }
 
   if (normalized.includes("?")) {
+    return true;
+  }
+
+  if (isDevTaskRequest(normalized)) {
     return true;
   }
 

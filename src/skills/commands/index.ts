@@ -1,7 +1,10 @@
 import { buildCheckInReplyNudge } from "../../core/companion-message.js";
 import { formatHealthAudit } from "../../core/health-audit.js";
-import { shouldUseCheckInNudge, isGeneralConversation } from "../../core/message-routing.js";
+import { shouldUseCheckInNudge, isGeneralConversation, isDevTaskRequest, extractDevTask } from "../../core/message-routing.js";
 import { respondToAssistantMessage } from "../../core/assistant/respond.js";
+import { getDevStatus } from "../../core/dev/status.js";
+import { isDevRunnerEnabled, queueManualDevTask } from "../../core/dev/state.js";
+import { runDevCycle } from "../../core/dev/runner.js";
 import { formatSkillCatalog } from "../../core/skill-catalog.js";
 import { clearConversation } from "../../core/memory/conversation.js";
 import {
@@ -55,6 +58,7 @@ function formatHelp(): string {
     "/remember <fact> — save a fact to Mem0",
     "/memories — list stored Mem0 memories",
     "/clear — clear this chat's short-term thread",
+    "/dev — dev status, or /dev run [task] to queue code changes",
     "/help — show this message",
   ].join("\n");
 }
@@ -80,6 +84,30 @@ async function handleRememberCommand(text: string, memoryUserId: string): Promis
 
   await addExplicitMemory(memoryUserId, fact);
   return `Got it — I'll remember: "${fact}"`;
+}
+
+async function handleDevCommand(text: string): Promise<string> {
+  const rest = text.trim().slice("/dev".length).trim();
+  const lower = rest.toLowerCase();
+
+  if (!rest || lower === "status") {
+    return getDevStatus();
+  }
+
+  if (lower === "run" || lower.startsWith("run ")) {
+    if (!isDevRunnerEnabled()) {
+      return "Dev runner disabled. Set DEV_RUNNER_ENABLED=true in .env and restart the worker.";
+    }
+    const task = rest.slice("run".length).trim();
+    if (task) {
+      await queueManualDevTask(task);
+      return `Queued: "${task}". You'll get a Telegram evolution brief when it finishes (usually 1-2 min).`;
+    }
+    const result = await runDevCycle(true);
+    return result ? ["Dev run complete.", "", result.brief].join("\n") : "Dev run skipped (already running).";
+  }
+
+  return `Unknown /dev command: ${rest}. Try /dev status or /dev run [task].`;
 }
 
 async function handleCommand(
@@ -125,8 +153,18 @@ async function buildReply(
     return handleRememberCommand(text, memoryUserId);
   }
 
+  if (command === "/dev") {
+    return handleDevCommand(text);
+  }
+
   if (command) {
     return await handleCommand(command, context, memoryUserId);
+  }
+
+  if (isDevRunnerEnabled() && isDevTaskRequest(text)) {
+    const task = extractDevTask(text);
+    await queueManualDevTask(task);
+    return `Got it — queued a code change: "${task.slice(0, 120)}${task.length > 120 ? "…" : ""}". I'll Telegram you an evolution brief when done.`;
   }
 
   const pendingSlot = await getPendingReplySlot();
