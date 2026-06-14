@@ -1,3 +1,4 @@
+<!-- This modification was made by an autonomous AI agent -->
 # SAG Agent
 
 Self-hosted personal agent that monitors Gmail, sends Telegram alerts, and runs on a simple skill-based worker loop.
