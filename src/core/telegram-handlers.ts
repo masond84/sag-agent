@@ -9,6 +9,7 @@ import {
 import { respondToAssistantMessage } from "./assistant/respond.js";
 import { getDevStatus } from "./dev/status.js";
 import { isDevRunnerEnabled, queueManualDevTask } from "./dev/state.js";
+import { isCursorOrchestratorMode } from "./orchestrator/config.js";
 import { runDevCycle } from "./dev/runner.js";
 import { formatSkillCatalog } from "./skill-catalog.js";
 import { clearConversation } from "./memory/conversation.js";
@@ -99,7 +100,10 @@ async function handleDevCommand(text: string): Promise<string> {
     const task = rest.slice("run".length).trim();
     if (task) {
       await queueManualDevTask(task);
-      return `Queued: "${task}". You'll get a Telegram evolution brief when it finishes (usually 1-2 min).`;
+      const modeHint = isCursorOrchestratorMode()
+        ? "Linear ticket + Cursor Cloud agent will run on the next dev cycle."
+        : "Local dev agent will run on the next dev cycle.";
+      return `Queued: "${task}". ${modeHint} You'll get a Telegram summary when it finishes.`;
     }
     const result = await runDevCycle(true);
     return result ? ["Dev run complete.", "", result.brief].join("\n") : "Dev run skipped (already running).";
@@ -162,7 +166,10 @@ export async function buildTelegramReply(
   if (isDevRunnerEnabled() && isDevTaskRequest(text)) {
     const task = extractDevTask(text);
     await queueManualDevTask(task);
-    return `Got it — queued a code change: "${task.slice(0, 120)}${task.length > 120 ? "…" : ""}". I'll Telegram you an evolution brief when done.`;
+    const modeHint = isCursorOrchestratorMode()
+      ? "I'll create a Linear ticket and launch Cursor Cloud."
+      : "I'll queue the local dev agent.";
+    return `Got it — ${modeHint} Task: "${task.slice(0, 120)}${task.length > 120 ? "…" : ""}"`;
   }
 
   const pendingSlot = await getPendingReplySlot();
