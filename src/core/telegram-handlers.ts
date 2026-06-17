@@ -112,6 +112,21 @@ async function handleDevCommand(text: string): Promise<string> {
   return `Unknown /dev command: ${rest}. Try /dev status or /dev run [task].`;
 }
 
+async function handleProfileCommand(): Promise<string> {
+  try {
+    return formatProfileSummary(await loadAgentProfile());
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return [
+      "Could not load your profile (data/profile.yaml).",
+      "",
+      detail,
+      "",
+      "Fix the YAML syntax, or delete data/profile.yaml to regenerate from config/agent-profile.template.yaml.",
+    ].join("\n");
+  }
+}
+
 async function handleCommand(
   command: string,
   context: InteractiveSkillContext,
@@ -125,7 +140,7 @@ async function handleCommand(
     case "/skills":
       return formatSkillsList(context);
     case "/profile":
-      return formatProfileSummary(await loadAgentProfile());
+      return handleProfileCommand();
     case "/memories":
       return listUserMemories(memoryUserId);
     case "/clear":
