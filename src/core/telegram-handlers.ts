@@ -119,7 +119,7 @@ async function handleCommand(
 ): Promise<string> {
   switch (command) {
     case "/ping":
-      return "SAG online";
+      return isCursorOrchestratorMode() ? "SAG online (orchestrator mode)" : "SAG online";
     case "/status":
       return ["SAG status", "", formatHealthAudit(context.health)].join("\n");
     case "/skills":
