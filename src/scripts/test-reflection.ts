@@ -1,4 +1,5 @@
-import { addAgentDiary, isMem0Enabled, listAgentMemories, resolveAgentId } from "../core/memory/mem0-service.js";
+import "dotenv/config";
+import { addAgentSeedMemory, isMem0Enabled, listAgentMemories, resolveAgentId } from "../core/memory/mem0-service.js";
 import { summarizeRecentActivity } from "../core/activity-log.js";
 
 async function main(): Promise<void> {
@@ -10,8 +11,8 @@ async function main(): Promise<void> {
 
   const seed = process.argv.find((arg) => arg.startsWith("--seed="))?.split("=").slice(1).join("=");
   if (seed) {
-    await addAgentDiary(seed, { source: "test" });
-    console.log("Seeded agent diary entry.\n");
+    await addAgentSeedMemory(seed, { source: "cli_seed" });
+    console.log("Seeded agent persona (stored verbatim, infer=false).\n");
   }
 
   console.log(await listAgentMemories(8));

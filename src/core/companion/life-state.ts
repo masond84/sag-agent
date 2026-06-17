@@ -33,6 +33,10 @@ function getWindowEndHour(): number {
   return Number(process.env.LIFE_COMPANION_WINDOW_END ?? 22);
 }
 
+function getSlotWindowMinutes(): number {
+  return Math.min(Math.max(Number(process.env.LIFE_COMPANION_SLOT_WINDOW_MINUTES ?? 5) || 5, 1), 30);
+}
+
 function minutesFromHourMinute(hour: number, minute: number): number {
   return hour * 60 + minute;
 }
@@ -128,7 +132,8 @@ export async function getDueLifeSlot(
     }
 
     const slotMin = minutesFromHourMinute(slot.hour, slot.minute);
-    if (slotMin === currentMin) {
+    const windowMin = getSlotWindowMinutes();
+    if (currentMin >= slotMin && currentMin < slotMin + windowMin) {
       return slot;
     }
   }
