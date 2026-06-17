@@ -10,6 +10,7 @@ interface AgentState {
   lastHeartbeatReportAt?: string;
   lastWatchdogAlertAt?: string;
   lastMorningBriefingDate?: string;
+  lastReflectionAt?: string;
 }
 
 async function ensureDataDir(): Promise<void> {
@@ -91,5 +92,16 @@ export async function getLastMorningBriefingDate(): Promise<string | undefined> 
 export async function markMorningBriefingSent(dateKey: string): Promise<void> {
   const state = await readState();
   state.lastMorningBriefingDate = dateKey;
+  await writeState(state);
+}
+
+export async function getLastReflectionAt(): Promise<string | undefined> {
+  const state = await readState();
+  return state.lastReflectionAt;
+}
+
+export async function markReflectionCompleted(slotKey: string): Promise<void> {
+  const state = await readState();
+  state.lastReflectionAt = slotKey;
   await writeState(state);
 }

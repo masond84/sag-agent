@@ -105,8 +105,16 @@ async function getBackend(): Promise<Mem0Backend | null> {
   }
 }
 
-function mem0Filters(userId: string): Record<string, string> {
+function mem0UserFilters(userId: string): Record<string, string> {
   return { user_id: userId };
+}
+
+function mem0AgentFilters(agentId: string): Record<string, string> {
+  return { agent_id: agentId };
+}
+
+export function resolveAgentId(): string {
+  return process.env.SAG_AGENT_ID?.trim() || "sag";
 }
 
 function formatMemoryResults(
@@ -154,7 +162,7 @@ export async function searchUserMemories(userId: string, query: string, topK = 6
 
   try {
     const result = await client.search(query, {
-      filters: mem0Filters(userId),
+      filters: mem0UserFilters(userId),
       topK,
     });
 
@@ -164,6 +172,37 @@ export async function searchUserMemories(userId: string, query: string, topK = 6
     logMem0Warn(`search failed: ${error instanceof Error ? error.message : String(error)}`);
     return "";
   }
+}
+
+export async function searchAgentMemories(query: string, topK = 6): Promise<string> {
+  const client = await getBackend();
+  if (!client) {
+    return "";
+  }
+
+  const agentId = resolveAgentId();
+
+  try {
+    const result = await client.search(query, {
+      filters: mem0AgentFilters(agentId),
+      topK,
+    });
+
+    const formatted = formatMemoryResults(result.results ?? [], "");
+    return formatted ? `What SAG remembers about itself:\n${formatted}` : "";
+  } catch (error) {
+    logMem0Warn(`agent search failed: ${error instanceof Error ? error.message : String(error)}`);
+    return "";
+  }
+}
+
+export async function searchMemoriesForChat(userId: string, query: string, topK = 6): Promise<string> {
+  const [userBlock, agentBlock] = await Promise.all([
+    searchUserMemories(userId, query, topK),
+    searchAgentMemories(query, topK),
+  ]);
+
+  return [userBlock, agentBlock].filter(Boolean).join("\n\n");
 }
 
 export async function addConversationToMem0(
@@ -176,6 +215,8 @@ export async function addConversationToMem0(
     return;
   }
 
+  const agentId = resolveAgentId();
+
   try {
     await client.add(
       [
@@ -187,8 +228,41 @@ export async function addConversationToMem0(
         metadata: { source: "telegram", type: "conversation" },
       },
     );
+
+    await client.add(
+      [
+        { role: "assistant", content: assistantText },
+        { role: "user", content: userText },
+      ],
+      {
+        agentId,
+        metadata: { source: "telegram", type: "agent_conversation" },
+      },
+    );
   } catch (error) {
     logMem0Warn(`add failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export async function addAgentDiary(
+  text: string,
+  metadata?: Record<string, string>,
+): Promise<void> {
+  const client = await getBackend();
+  if (!client) {
+    return;
+  }
+
+  const agentId = resolveAgentId();
+
+  try {
+    await client.add([{ role: "assistant", content: text }], {
+      agentId,
+      infer: true,
+      metadata: { source: "reflection", type: "agent_diary", ...metadata },
+    });
+  } catch (error) {
+    logMem0Warn(`agent diary add failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -216,13 +290,13 @@ export async function listUserMemories(userId: string, limit = 10): Promise<stri
 
     if (client instanceof MemoryClient) {
       const page = await client.getAll({
-        filters: mem0Filters(userId),
+        filters: mem0UserFilters(userId),
         pageSize: limit,
       });
       results = page.results ?? [];
     } else {
       const page = await client.getAll({
-        filters: mem0Filters(userId),
+        filters: mem0UserFilters(userId),
         topK: limit,
       });
       results = page.results ?? [];
@@ -233,6 +307,39 @@ export async function listUserMemories(userId: string, limit = 10): Promise<stri
   } catch (error) {
     logMem0Warn(`getAll failed: ${error instanceof Error ? error.message : String(error)}`);
     return "Could not load memories right now.";
+  }
+}
+
+export async function listAgentMemories(limit = 10): Promise<string> {
+  const client = await getBackend();
+  if (!client) {
+    return "Mem0 is not configured.";
+  }
+
+  const agentId = resolveAgentId();
+
+  try {
+    let results: Array<{ memory?: string }> = [];
+
+    if (client instanceof MemoryClient) {
+      const page = await client.getAll({
+        filters: mem0AgentFilters(agentId),
+        pageSize: limit,
+      });
+      results = page.results ?? [];
+    } else {
+      const page = await client.getAll({
+        filters: mem0AgentFilters(agentId),
+        topK: limit,
+      });
+      results = page.results ?? [];
+    }
+
+    const formatted = formatMemoryResults(results, "No agent memories stored yet.");
+    return ["SAG's stored memories:", formatted].join("\n");
+  } catch (error) {
+    logMem0Warn(`agent getAll failed: ${error instanceof Error ? error.message : String(error)}`);
+    return "Could not load agent memories right now.";
   }
 }
 
