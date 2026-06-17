@@ -15,7 +15,7 @@ function isEnabled(): boolean {
 }
 
 function isHourlyMode(): boolean {
-  return (process.env.FOCUS_HOURLY ?? "true").toLowerCase() === "true";
+  return (process.env.FOCUS_HOURLY ?? "false").toLowerCase() === "true";
 }
 
 function parseAnchorHours(): number[] {
