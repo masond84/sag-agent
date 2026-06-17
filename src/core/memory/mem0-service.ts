@@ -128,10 +128,6 @@ export function isMem0Enabled(): boolean {
   return isMem0Configured();
 }
 
-export function getMem0InitError(): string | undefined {
-  return initError;
-}
-
 export function resolveMemoryUserId(chatId?: number | string): string {
   const override = process.env.SAG_USER_ID?.trim();
   if (override) {
