@@ -14,6 +14,7 @@
     "test:morning": "tsx src/scripts/test-morning.ts",
     "test:heartbeat": "tsx src/scripts/test-heartbeat.ts",
     "test:focus": "tsx src/scripts/test-focus.ts",
+    "test:life": "tsx src/scripts/test-life-companion.ts",
     "test:memory": "tsx src/scripts/test-memory.ts",
     "test:activity": "tsx src/scripts/test-activity-log.ts",
     "test:reflection": "tsx src/scripts/test-reflection.ts",
