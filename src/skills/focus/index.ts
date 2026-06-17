@@ -1,3 +1,4 @@
+import { logActivity } from "../../core/activity-log.js";
 import { buildCompanionMessage, resolveCompanionIntent } from "../../core/companion-message.js";
 import {
   getFocusTimeZone,
@@ -99,6 +100,7 @@ async function runFocusCompanion(_context: AgentHealthContext): Promise<Schedule
   const message = await buildCompanionMessage(intent, slot, timeZone);
 
   await markTouchpointSent(slot, timeZone);
+  await logActivity("focus_sent", `Focus check-in (${intent})`, { slot, intent });
 
   if (anchorHours.includes(currentHour)) {
     await setPendingReplySlot(slot);

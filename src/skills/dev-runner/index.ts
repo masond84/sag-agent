@@ -1,3 +1,4 @@
+import { logActivity } from "../../core/activity-log.js";
 import type { AgentHealthContext, ScheduledSkill, ScheduledSkillResult } from "../../types.js";
 import { refreshWorkerAfterMerge } from "../../core/dev/restart.js";
 import { runDevCycle } from "../../core/dev/runner.js";
@@ -12,6 +13,11 @@ export const devRunnerSkill: ScheduledSkill = {
     if (!isDevRunnerEnabled()) return null;
     const result = await runDevCycle();
     if (!result?.notify) return null;
+
+    await logActivity("dev_cycle", result.brief.slice(0, 200), {
+      merged: result.mergedPrs.length,
+      prs: result.mergedPrs.join(","),
+    });
 
     const header = result.mergedPrs.length
       ? `SAG evolved (merged ${result.mergedPrs.map((n) => `#${n}`).join(", ")})`

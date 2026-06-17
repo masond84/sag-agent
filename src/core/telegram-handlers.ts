@@ -1,3 +1,4 @@
+import { logActivity } from "./activity-log.js";
 import { buildCheckInReplyNudge } from "./companion-message.js";
 import { formatHealthAudit } from "./health-audit.js";
 import {
@@ -162,6 +163,10 @@ export async function buildTelegramReply(
   const command = parseCommand(text);
   const memoryUserId = resolveMemoryUserId(chatId);
 
+  if (!command) {
+    await logActivity("chat_in", text.slice(0, 120));
+  }
+
   if (command === "/focus") {
     return handleFocusCommand(text);
   }
@@ -192,15 +197,20 @@ export async function buildTelegramReply(
   if (shouldUseCheckInNudge(text, pendingSlot)) {
     await recordTouchpointReply(pendingSlot!, text);
     await clearPendingReplySlot();
-    return buildCheckInReplyNudge(text, pendingSlot!, getFocusTimeZone());
+    await logActivity("focus_reply", text.slice(0, 120), { slot: pendingSlot! });
+    const nudge = await buildCheckInReplyNudge(text, pendingSlot!, getFocusTimeZone());
+    await logActivity("chat_out", nudge.slice(0, 120));
+    return nudge;
   }
 
   if (pendingSlot && isGeneralConversation(text)) {
     await clearPendingReplySlot();
   }
 
-  return respondToAssistantMessage(text, context, {
+  const reply = await respondToAssistantMessage(text, context, {
     pendingCheckInSlot: pendingSlot && !isGeneralConversation(text) ? pendingSlot : undefined,
     memoryUserId,
   });
+  await logActivity("chat_out", reply.slice(0, 120));
+  return reply;
 }
