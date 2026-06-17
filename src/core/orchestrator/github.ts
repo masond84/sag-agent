@@ -69,6 +69,6 @@ export async function getPullRequestSummary(prNumber: number): Promise<string> {
   }
 }
 
-export async function autoMergePullRequest(prNumber: number): Promise<{ merged: boolean; title: string }> {
+export async function autoMergePullRequest(prNumber: number): Promise<{ merged: boolean; title: string; wasDraft?: boolean }> {
   return mergePullRequest(prNumber);
 }

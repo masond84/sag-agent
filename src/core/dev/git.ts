@@ -80,16 +80,28 @@ export async function createPullRequest(title: string, body: string): Promise<{ 
   return { number, url };
 }
 
-export async function mergePullRequest(prNumber: number): Promise<{ merged: boolean; title: string }> {
-  const info = JSON.parse(await gh(["pr", "view", String(prNumber), "--json", "title,state"])) as {
+export async function mergePullRequest(prNumber: number): Promise<{ merged: boolean; title: string; wasDraft?: boolean }> {
+  const info = JSON.parse(await gh(["pr", "view", String(prNumber), "--json", "title,state,isDraft"])) as {
     title: string;
     state: string;
+    isDraft: boolean;
   };
   if (info.state !== "OPEN") {
     return { merged: false, title: info.title };
   }
-  await gh(["pr", "merge", String(prNumber), "--merge", "--delete-branch"]);
-  return { merged: true, title: info.title };
+
+  let wasDraft = false;
+  if (info.isDraft) {
+    await gh(["pr", "ready", String(prNumber)]);
+    wasDraft = true;
+  }
+
+  try {
+    await gh(["pr", "merge", String(prNumber), "--merge", "--delete-branch"]);
+    return { merged: true, title: info.title, wasDraft };
+  } catch {
+    return { merged: false, title: info.title, wasDraft };
+  }
 }
 
 export async function listOpenPullRequests(): Promise<string> {
