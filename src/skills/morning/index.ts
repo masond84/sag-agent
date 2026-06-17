@@ -1,3 +1,4 @@
+import { logActivity } from "../../core/activity-log.js";
 import { getZonedTimeInfo, hasReachedDailyTime } from "../../core/schedule.js";
 import {
   getLastMorningBriefingDate,
@@ -37,6 +38,7 @@ async function runMorningBriefing(_context: AgentHealthContext): Promise<Schedul
 
   const now = getZonedTimeInfo(timeZone);
   await markMorningBriefingSent(now.dateKey);
+  await logActivity("morning_briefing", `Morning briefing sent (${now.weekday})`);
 
   return {
     type: "briefing",

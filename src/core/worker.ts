@@ -1,3 +1,4 @@
+import { logActivity } from "./activity-log.js";
 import { saveBill } from "./bills.js";
 import type { AgentHealthContext, LoadedSkills, WorkerConfig } from "../types.js";
 import { fetchMessages, formatGmailAuthError, isGmailConfigured } from "./gmail.js";
@@ -35,6 +36,10 @@ async function processEmailSkills(skills: LoadedSkills, config: WorkerConfig): P
 
     const messages = await fetchMessages(skill.config.trigger.gmailQuery, 10);
     log("debug", `Found ${messages.length} candidate message(s)`);
+    await logActivity("gmail_poll", `Polled ${skill.config.name}: ${messages.length} candidate(s)`, {
+      skill: skill.config.id,
+      candidates: messages.length,
+    });
 
     for (const message of messages) {
       if (!(await hasProcessed(message.id))) {
@@ -53,6 +58,10 @@ async function processEmailSkills(skills: LoadedSkills, config: WorkerConfig): P
         const notificationBody = skill.format(extracted);
         log("info", `Prepared notification:\n${notificationBody}`);
         await saveBill(message.id, extracted);
+        await logActivity("gmail_bill_processed", `Processed bill: ${message.subject}`, {
+          skill: skill.config.id,
+          messageId: message.id,
+        });
 
         if (config.dryRun) {
           log("info", "DRY_RUN=true — notification not sent");

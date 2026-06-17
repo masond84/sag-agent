@@ -21,7 +21,7 @@ Autonomous code changes follow one pipeline:
 **Telegram → Linear → Cursor Cloud → auto-merge**
 
 1. **Telegram** — You request a change in chat (`/dev run …` or natural language when `DEV_RUNNER_ENABLED=true`). SAG queues the task and sends an evolution brief when it finishes.
-2. **Linear** — Work is tracked as issues in the SAG workspace (e.g. `SAG-6`). Each issue links to the repo, scope, and acceptance criteria.
+2. **Linear** — Work is tracked as issues in the SAG workspace (e.g. `SAG-6`). After a successful merge, SAG marks the issue Done and links the PR.
 3. **Cursor Cloud** — A cloud agent implements the change on a feature branch, runs `npm run build`, and opens a PR targeting `main`.
 4. **Auto-merge** — When checks pass, draft Cursor PRs are marked ready, then the PR merges to `main` and the worker picks up the latest code on the next cycle.
 5. **Post-merge audit** — When enabled (`DEV_POST_MERGE_AUDIT`, default on), SAG queues a follow-up Cursor Cloud review of `main` after each merge.

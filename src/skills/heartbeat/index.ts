@@ -1,3 +1,4 @@
+import { logActivity } from "../../core/activity-log.js";
 import type { AgentHealthContext, ScheduledSkill, ScheduledSkillResult } from "../../types.js";
 import { buildAliveReportMessage, buildRecoveryMessage } from "../../core/heartbeat-message.js";
 import {
@@ -53,6 +54,7 @@ function isWorkerStale(previousLastRunAt?: string): boolean {
 async function runHeartbeat(context: AgentHealthContext): Promise<ScheduledSkillResult | null> {
   if (isWorkerStale(context.previousLastRunAt) && (await shouldSendStaleAlert())) {
     await markWatchdogAlerted();
+    await logActivity("heartbeat_recovery", "Worker recovery alert — SAG came back online");
 
     return {
       type: "alert",
@@ -65,6 +67,7 @@ async function runHeartbeat(context: AgentHealthContext): Promise<ScheduledSkill
   }
 
   await markHeartbeatReported();
+  await logActivity("heartbeat_report", "Daily alive heartbeat report sent");
 
   return {
     type: "report",

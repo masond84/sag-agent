@@ -15,6 +15,7 @@
     "test:heartbeat": "tsx src/scripts/test-heartbeat.ts",
     "test:focus": "tsx src/scripts/test-focus.ts",
     "test:memory": "tsx src/scripts/test-memory.ts",
+    "test:activity": "tsx src/scripts/test-activity-log.ts",
     "test:dev": "tsx src/scripts/test-dev.ts",
     "test:orchestrator": "tsx src/scripts/test-orchestrator.ts",
     "test:telegram": "tsx src/scripts/test-telegram.ts",
