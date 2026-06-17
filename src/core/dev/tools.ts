@@ -3,8 +3,8 @@ import path from "node:path";
 import { readRepoFile, searchRepo } from "../assistant/repo-tools.js";
 import { normalizeRelativePath, resolveWritePath } from "./guardrails.js";
 import {
-  createPullRequest, createWorkBranch, getGitDiff, getGitStatus, getRecentMerges,
-  listOpenPullRequests, mergePullRequest, pushCurrentBranch, runBuild, stageAndCommit,
+  createPullRequest, createWorkBranch, formatPullRequestMergeMessage, getGitDiff, getGitStatus,
+  getRecentMerges, listOpenPullRequests, mergePullRequest, pushCurrentBranch, runBuild, stageAndCommit,
 } from "./git.js";
 import type { ToolDefinition } from "../llm.js";
 
@@ -69,15 +69,13 @@ export async function executeDevTool(name: string, argsJson: string, session: De
       if (!session.buildPassed) return "Run run_build first.";
       if (session.mergedPrs.length >= Number(process.env.DEV_MAX_MERGES_PER_RUN ?? 3)) return "Merge limit reached.";
       {
-        const r = await mergePullRequest(Number(args.pr_number));
+        const prNumber = Number(args.pr_number);
+        const r = await mergePullRequest(prNumber);
         if (r.merged) {
-          session.mergedPrs.push(Number(args.pr_number));
+          session.mergedPrs.push(prNumber);
           session.buildPassed = false;
-          return `Merged #${args.pr_number}${r.wasDraft ? " (was draft, marked ready)" : ""}`;
         }
-        return r.wasDraft
-          ? `PR #${args.pr_number} not merged (${r.title}) after marking ready.`
-          : `PR #${args.pr_number} not open (${r.title}).`;
+        return formatPullRequestMergeMessage(prNumber, r);
       }
     case "list_open_prs": return listOpenPullRequests();
     case "recent_merges": return getRecentMerges();

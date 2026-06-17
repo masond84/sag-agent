@@ -6,6 +6,7 @@ import {
   isPostMergeAuditEnabled,
 } from "./config.js";
 import { runCursorCloudAgent } from "./cursor-cloud.js";
+import { formatPullRequestMergeMessage } from "../dev/git.js";
 import { autoMergePullRequest, getPullRequestSummary, waitForPullRequest } from "./github.js";
 import { createLinearIssue } from "./linear-client.js";
 import { buildOrchestratorPrompt } from "./prompts.js";
@@ -74,18 +75,12 @@ export async function runOrchestratorCycle(trigger: DevTrigger): Promise<Orchest
     const merge = await autoMergePullRequest(pr.number);
     if (merge.merged) {
       mergedPrs.push(pr.number);
-      briefParts.push(
-        `Merged PR #${pr.number}: ${merge.title}${merge.wasDraft ? " (was draft, marked ready)" : ""}`,
-      );
       if (isPostMergeAuditEnabled()) {
         await queuePostMergeScan(pr.number, merge.title);
         briefParts.push("Queued post-merge audit.");
       }
-    } else {
-      briefParts.push(
-        `PR #${pr.number} was not merged (${merge.title})${merge.wasDraft ? " after marking ready" : ""}.`,
-      );
     }
+    briefParts.push(formatPullRequestMergeMessage(pr.number, merge));
   } else {
     briefParts.push(`PR ready for review: ${pr.url}`);
   }

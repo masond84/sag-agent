@@ -59,6 +59,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:telegram` | Test Telegram send |
 | `npm run test:focus` | Preview focus companion messages |
 | `npm run test:dev` | Dev runner status |
+| `npm run test:merge-result` | Merge result message smoke test (no `gh` required) |
 | `npm run launchd:install` | Mac background auto-start |
 
 ## Deployment

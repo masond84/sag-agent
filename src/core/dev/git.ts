@@ -80,20 +80,48 @@ export async function createPullRequest(title: string, body: string): Promise<{ 
   return { number, url };
 }
 
+export type PullRequestMergeFailure = "not_open" | "ready_failed" | "merge_failed" | "view_failed";
+
 export interface PullRequestMergeResult {
   merged: boolean;
   title: string;
   wasDraft: boolean;
+  failure?: PullRequestMergeFailure;
+}
+
+export function formatPullRequestMergeMessage(prNumber: number, result: PullRequestMergeResult): string {
+  if (result.merged) {
+    return `Merged PR #${prNumber}: ${result.title}${result.wasDraft ? " (was draft, marked ready)" : ""}`;
+  }
+  switch (result.failure) {
+    case "not_open":
+      return `PR #${prNumber} not open (${result.title}).`;
+    case "ready_failed":
+      return `PR #${prNumber} not merged (${result.title}): could not mark draft ready.`;
+    case "view_failed":
+      return `PR #${prNumber} not merged: could not load PR details.`;
+    case "merge_failed":
+    default:
+      return result.wasDraft
+        ? `PR #${prNumber} not merged (${result.title}) after marking ready.`
+        : `PR #${prNumber} not merged (${result.title}).`;
+  }
 }
 
 export async function mergePullRequest(prNumber: number): Promise<PullRequestMergeResult> {
-  const info = JSON.parse(await gh(["pr", "view", String(prNumber), "--json", "title,state,isDraft"])) as {
-    title: string;
-    state: string;
-    isDraft: boolean;
-  };
+  let info: { title: string; state: string; isDraft: boolean };
+  try {
+    info = JSON.parse(await gh(["pr", "view", String(prNumber), "--json", "title,state,isDraft"])) as {
+      title: string;
+      state: string;
+      isDraft: boolean;
+    };
+  } catch {
+    return { merged: false, title: `PR #${prNumber}`, wasDraft: false, failure: "view_failed" };
+  }
+
   if (info.state !== "OPEN") {
-    return { merged: false, title: info.title, wasDraft: false };
+    return { merged: false, title: info.title, wasDraft: false, failure: "not_open" };
   }
 
   const wasDraft = info.isDraft;
@@ -101,7 +129,7 @@ export async function mergePullRequest(prNumber: number): Promise<PullRequestMer
     try {
       await gh(["pr", "ready", String(prNumber)]);
     } catch {
-      return { merged: false, title: info.title, wasDraft: true };
+      return { merged: false, title: info.title, wasDraft: true, failure: "ready_failed" };
     }
   }
 
@@ -109,7 +137,7 @@ export async function mergePullRequest(prNumber: number): Promise<PullRequestMer
     await gh(["pr", "merge", String(prNumber), "--merge", "--delete-branch"]);
     return { merged: true, title: info.title, wasDraft };
   } catch {
-    return { merged: false, title: info.title, wasDraft };
+    return { merged: false, title: info.title, wasDraft, failure: "merge_failed" };
   }
 }
 
