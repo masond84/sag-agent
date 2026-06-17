@@ -1,15 +1,16 @@
 import { saveBill } from "./bills.js";
-import type { AgentHealthContext, EmailSkill, LoadedSkills, ScheduledSkill, WorkerConfig } from "../types.js";
+import type { AgentHealthContext, LoadedSkills, WorkerConfig } from "../types.js";
 import { fetchMessages, formatGmailAuthError, isGmailConfigured } from "./gmail.js";
 import { getActiveNotifierLabel, isTelegramConfigured, sendNotification } from "./notify.js";
 import { summarizeSkills } from "./registry.js";
+import { runScheduledTick, startScheduledCron } from "./scheduler.js";
 import {
   getLastRunAt,
   getProcessedMessageCount,
   hasProcessed,
   markProcessed,
-  touchWorkerRun,
 } from "./state.js";
+import { startTelegramBot } from "./telegram-bot.js";
 
 function log(level: WorkerConfig["logLevel"], message: string): void {
   const levels = { debug: 0, info: 1, warn: 2, error: 3 };
@@ -20,102 +21,53 @@ function log(level: WorkerConfig["logLevel"], message: string): void {
   }
 }
 
-async function sendPreparedNotification(body: string, config: WorkerConfig, label: string): Promise<void> {
-  if (config.dryRun) {
-    log("info", "DRY_RUN=true — notification not sent");
+async function processEmailSkills(skills: LoadedSkills, config: WorkerConfig): Promise<void> {
+  if (!isGmailConfigured()) {
+    log(
+      "warn",
+      "Gmail not configured — email skills skipped. Run `npm run auth:gmail` after setting Gmail credentials in .env",
+    );
     return;
   }
 
-  if (!isTelegramConfigured()) {
-    log("warn", `${getActiveNotifierLabel()} not configured — notification not sent`);
-    return;
-  }
+  for (const skill of skills.email) {
+    log("info", `Checking email skill: ${skill.config.name}`);
 
-  await sendNotification(body);
-  log("info", `${label} sent via ${getActiveNotifierLabel()}`);
-}
+    const messages = await fetchMessages(skill.config.trigger.gmailQuery, 10);
+    log("debug", `Found ${messages.length} candidate message(s)`);
 
-async function processEmailSkill(skill: EmailSkill, config: WorkerConfig): Promise<void> {
-  log("info", `Checking email skill: ${skill.config.name}`);
+    for (const message of messages) {
+      if (!(await hasProcessed(message.id))) {
+        if (!skill.matches(message)) {
+          continue;
+        }
 
-  const messages = await fetchMessages(skill.config.trigger.gmailQuery, 10);
-  log("debug", `Found ${messages.length} candidate message(s)`);
+        log("info", `Processing message ${message.id}: ${message.subject}`);
 
-  for (const message of messages) {
-    if (!(await hasProcessed(message.id))) {
-      if (!skill.matches(message)) {
+        const extracted = skill.extract(message);
+        if (!extracted) {
+          log("warn", `Could not extract data from message ${message.id}`);
+          continue;
+        }
+
+        const notificationBody = skill.format(extracted);
+        log("info", `Prepared notification:\n${notificationBody}`);
+        await saveBill(message.id, extracted);
+
+        if (config.dryRun) {
+          log("info", "DRY_RUN=true — notification not sent");
+        } else if (!isTelegramConfigured()) {
+          log("warn", `${getActiveNotifierLabel()} not configured — notification not sent`);
+        } else {
+          await sendNotification(notificationBody);
+          log("info", `Notification sent via ${getActiveNotifierLabel()}`);
+        }
+
+        await markProcessed(message.id);
         continue;
       }
 
-      log("info", `Processing message ${message.id}: ${message.subject}`);
-
-      const extracted = skill.extract(message);
-      if (!extracted) {
-        log("warn", `Could not extract data from message ${message.id}`);
-        continue;
-      }
-
-      const notificationBody = skill.format(extracted);
-      log("info", `Prepared notification:\n${notificationBody}`);
-      await saveBill(message.id, extracted);
-      await sendPreparedNotification(notificationBody, config, "Notification");
-      await markProcessed(message.id);
-      continue;
-    }
-
-    log("debug", `Skipping already processed message ${message.id}`);
-  }
-}
-
-async function processScheduledSkill(
-  skill: ScheduledSkill,
-  context: AgentHealthContext,
-  config: WorkerConfig,
-): Promise<void> {
-  log("info", `Checking scheduled skill: ${skill.config.name}`);
-
-  const result = await skill.run(context);
-  if (!result) {
-    log("debug", `No action needed for ${skill.config.name}`);
-    return;
-  }
-
-  log("info", `Prepared ${result.type}:\n${result.message}`);
-
-  if (result.bypassDryRun) {
-    if (!isTelegramConfigured()) {
-      log("warn", `${getActiveNotifierLabel()} not configured — notification not sent`);
-      return;
-    }
-    await sendNotification(result.message);
-    log("info", `${result.type} sent via ${getActiveNotifierLabel()}`);
-    return;
-  }
-
-  await sendPreparedNotification(result.message, config, result.type === "alert" ? "Watchdog alert" : "Heartbeat");
-}
-
-async function processInteractiveSkills(skills: LoadedSkills, context: AgentHealthContext): Promise<void> {
-  if (skills.interactive.length === 0) {
-    return;
-  }
-
-  if (!isTelegramConfigured()) {
-    log("warn", "Telegram not configured — interactive skills skipped");
-    return;
-  }
-
-  const interactiveContext = {
-    health: context,
-    skills: summarizeSkills(skills),
-  };
-
-  for (const skill of skills.interactive) {
-    log("info", `Checking interactive skill: ${skill.config.name}`);
-    try {
-      await skill.run(interactiveContext);
-    } catch (error) {
-      log("error", error instanceof Error ? error.message : String(error));
+      log("debug", `Skipping already processed message ${message.id}`);
     }
   }
 }
@@ -137,52 +89,49 @@ export async function buildHealthContext(
   };
 }
 
-export async function runWorkerCycle(skills: LoadedSkills, config: WorkerConfig): Promise<void> {
-  const healthContext = await buildHealthContext(skills, config);
-  const heartbeat = skills.scheduled.find((skill) => skill.config.id === "heartbeat");
-  const otherScheduled = skills.scheduled.filter((skill) => skill.config.id !== "heartbeat");
-
-  if (heartbeat) {
-    await processScheduledSkill(heartbeat, healthContext, config);
-  }
-
-  await touchWorkerRun();
-
-  await processInteractiveSkills(skills, healthContext);
-
-  if (isGmailConfigured()) {
-    for (const skill of skills.email) {
-      await processEmailSkill(skill, config);
-    }
-  } else {
-    log(
-      "warn",
-      "Gmail not configured — email skills skipped. Run `npm run auth:gmail` after setting Gmail credentials in .env",
-    );
-  }
-
-  for (const skill of otherScheduled) {
-    await processScheduledSkill(skill, healthContext, config);
-  }
-}
-
 export async function runWorker(skills: LoadedSkills, config: WorkerConfig, once = false): Promise<void> {
   const skillCount = skills.email.length + skills.scheduled.length + skills.interactive.length;
   log("info", `SAG worker started (dryRun=${config.dryRun}, once=${once}, skills=${skillCount})`);
 
-  const cycle = async () => {
+  const getHealthContext = () => buildHealthContext(skills, config);
+  const getInteractiveContext = async () => ({
+    health: await getHealthContext(),
+    skills: summarizeSkills(skills),
+  });
+
+  if (!once && isTelegramConfigured() && skills.interactive.length > 0) {
+    await startTelegramBot(getInteractiveContext);
+  } else if (!once && skills.interactive.length > 0 && !isTelegramConfigured()) {
+    log("warn", "Telegram not configured — chat bot not started");
+  }
+
+  const runEmailCycle = async () => {
     try {
-      await runWorkerCycle(skills, config);
+      await processEmailSkills(skills, config);
     } catch (error) {
       log("error", formatGmailAuthError(error));
     }
   };
 
-  await cycle();
+  const runScheduleOnce = async () => {
+    try {
+      const context = await getHealthContext();
+      await runScheduledTick(skills, context, config);
+    } catch (error) {
+      log("error", error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  await runScheduleOnce();
+  await runEmailCycle();
 
   if (once) {
     return;
   }
 
-  setInterval(cycle, config.pollIntervalMs);
+  startScheduledCron(skills, getHealthContext, config);
+  log("info", `Scheduled skills cron started (pattern=${process.env.SCHEDULE_CRON?.trim() || "* * * * *"})`);
+  log("info", `Email poll interval: ${config.pollIntervalMs}ms`);
+
+  setInterval(runEmailCycle, config.pollIntervalMs);
 }

@@ -29,8 +29,10 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0",
+    "croner": "^10.0.1",
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
+    "grammy": "^1.44.0",
     "mem0ai": "^3.0.8",
     "yaml": "^2.7.0"
   },

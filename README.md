@@ -1,1 +1,56 @@
-Fully autonomous SAG agent.
+# SAG Agent
+
+Self-hosted personal agent: Telegram chat, Gmail monitoring, scheduled check-ins, optional autonomous dev runner.
+
+## Architecture
+
+Three independent loops (same process):
+
+| Loop | Driver | Handles |
+|------|--------|---------|
+| **Chat** | Grammy long-polling | Telegram commands + natural language |
+| **Schedule** | Croner (`* * * * *` by default) | Focus, morning, heartbeat, dev-runner |
+| **Email** | `POLL_INTERVAL_MS` (default 10 min) | Gmail skills (e.g. Conservice bills) |
+
+Skills are configured in `config/skills/` and implemented under `src/skills/`.
+
+## Quick start
+
+```bash
+npm install
+cp .env.example .env   # fill TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OPENAI_API_KEY
+npm run build
+npm run worker:once    # one schedule + email cycle (no Telegram long-poll)
+npm run dev            # continuous: Telegram + cron + email
+```
+
+Find your Telegram chat ID: `npm run telegram:chat-id`
+
+## Key environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot + authorized chat |
+| `OPENAI_API_KEY` | Assistant + companion LLM replies |
+| `POLL_INTERVAL_MS` | Gmail poll interval (not chat) |
+| `SCHEDULE_CRON` | Cron pattern for scheduled skills (default every minute) |
+| `DRY_RUN` | `true` = log email notifications without sending |
+| `DEV_RUNNER_ENABLED` | `true` = autonomous code/PR loop (requires `gh auth`) |
+| `FOCUS_HOURLY` | `false` = anchor check-ins only (8, 13, 21) |
+
+## Useful scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Run worker with hot reload |
+| `npm run worker:once` | Single schedule + email cycle |
+| `npm run test:telegram` | Test Telegram send |
+| `npm run test:focus` | Preview focus companion messages |
+| `npm run test:dev` | Dev runner status |
+| `npm run launchd:install` | Mac background auto-start |
+
+## Deployment
+
+Primary: **launchd** on Mac (`npm run launchd:install`). Optional: Docker (`docker-compose up`).
+
+Never commit `.env` or `data/`.
