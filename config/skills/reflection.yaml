@@ -1,0 +1,4 @@
+id: reflection
+name: Agent Reflection
+enabled: true
+kind: scheduled

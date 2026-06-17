@@ -18,6 +18,7 @@ import { devRunnerSkill } from "../skills/dev-runner/index.js";
 import { heartbeatSkill } from "../skills/heartbeat/index.js";
 import { morningSkill } from "../skills/morning/index.js";
 import { focusCompanionSkill } from "../skills/focus/index.js";
+import { reflectionSkill } from "../skills/reflection/index.js";
 import { commandsSkill } from "../skills/commands/index.js";
 
 const CONFIG_DIR = path.resolve(process.cwd(), "config/skills");
@@ -31,6 +32,7 @@ const scheduledSkillFactories: Record<string, () => ScheduledSkill> = {
   "dev-runner": () => devRunnerSkill,
   "morning-briefing": () => morningSkill,
   "focus-companion": () => focusCompanionSkill,
+  reflection: () => reflectionSkill,
 };
 
 const interactiveSkillFactories: Record<string, () => InteractiveSkill> = {
