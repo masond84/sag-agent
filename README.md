@@ -25,6 +25,8 @@ Autonomous code changes follow one pipeline:
 3. **Cursor Cloud** — A cloud agent implements the change on a feature branch, runs `npm run build`, and opens a PR targeting `main`.
 4. **Auto-merge** — When checks pass, the PR merges to `main` and the worker picks up the latest code on the next cycle.
 
+Draft Cursor PRs are marked ready automatically before merge.
+
 ## Quick start
 
 ```bash
