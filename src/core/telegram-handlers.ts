@@ -16,6 +16,7 @@ import { formatSkillCatalog } from "./skill-catalog.js";
 import { clearConversation } from "./memory/conversation.js";
 import {
   addExplicitMemory,
+  listAgentMemories,
   listUserMemories,
   resolveMemoryUserId,
 } from "./memory/mem0-service.js";
@@ -42,11 +43,12 @@ export function formatHelp(): string {
     "",
     "Talk naturally, for example:",
     "- Hey — just saying hi",
-    "- What skills can you run?",
+    "- What do you remember from yesterday?",
+    "- What have you been doing today?",
     "- What was my last utility bill?",
     "- I'm bored, want to chat",
     "",
-    "Daily companion: check-ins and focus tracking. Reply to a check-in for an immediate nudge.",
+    "Companion: focus check-ins (work) + random life texts (personal). Co-create SAG's personality over time.",
     "Set focus: /focus followed by your goal (e.g. /focus Ship the PR)",
     "",
     "Commands:",
@@ -55,8 +57,9 @@ export function formatHelp(): string {
     "/skills — list active skills",
     "/focus — show today's focus",
     "/profile — show your stable profile",
-    "/remember <fact> — save a fact to Mem0",
-    "/memories — list stored Mem0 memories",
+    "/remember <fact> — save a fact about you to Mem0",
+    "/memories — list your stored Mem0 memories",
+    "/sag-memories — list what SAG remembers about itself",
     "/clear — clear this chat's short-term thread",
     "/dev — dev status, or /dev run [task] to queue code changes",
     "/help — show this message",
@@ -144,6 +147,8 @@ async function handleCommand(
       return handleProfileCommand();
     case "/memories":
       return listUserMemories(memoryUserId);
+    case "/sag-memories":
+      return listAgentMemories();
     case "/clear":
       await clearConversation(memoryUserId);
       return "Cleared this chat's short-term conversation thread.";
