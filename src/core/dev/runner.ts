@@ -5,7 +5,7 @@ import { runOrchestratorCycle } from "../orchestrator/runner.js";
 import { runDevAgent } from "./agent.js";
 import {
   acquireDevLock, isDevRunnerEnabled, isDevRunLocked, pickNextTrigger,
-  queueManualDevTask, queuePostMergeScan, recordDevRun, releaseDevLock, type DevTrigger,
+  queuePostMergeScan, recordDevRun, releaseDevLock, type DevTrigger,
 } from "./state.js";
 
 export interface DevCycleResult {
@@ -69,9 +69,4 @@ export async function runDevCycle(force = false): Promise<DevCycleResult | null>
   } finally {
     await releaseDevLock();
   }
-}
-
-export async function queueAndRunDevTask(task: string): Promise<DevCycleResult | null> {
-  await queueManualDevTask(task);
-  return runDevCycle(true);
 }
