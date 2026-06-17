@@ -43,24 +43,29 @@ function getDevModel(): string {
 async function runChatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  options?: { maxTokens?: number; model?: string },
+  options?: { maxTokens?: number; model?: string; toolChoice?: "auto" | "required" | "none" },
 ): Promise<{ message: ChatMessage; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
 
+  const body: Record<string, unknown> = {
+    model: options?.model ?? getModel(),
+    max_tokens: options?.maxTokens ?? getMaxTokens(),
+    messages,
+  };
+
+  if (tools.length > 0 && options?.toolChoice !== "none") {
+    body.tools = tools.map((tool) => ({
+      type: "function",
+      function: { name: tool.name, description: tool.description, parameters: tool.parameters },
+    }));
+    body.tool_choice = options?.toolChoice ?? "auto";
+  }
+
   const response = await fetch(`${getBaseUrl()}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: options?.model ?? getModel(),
-      max_tokens: options?.maxTokens ?? getMaxTokens(),
-      messages,
-      tools: tools.map((tool) => ({
-        type: "function",
-        function: { name: tool.name, description: tool.description, parameters: tool.parameters },
-      })),
-      tool_choice: "auto",
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) throw new Error(`LLM request failed (${response.status}): ${await response.text()}`);
@@ -82,8 +87,12 @@ async function runChatCompletion(
   };
 }
 
-export async function runAssistantTurn(messages: ChatMessage[], tools: ToolDefinition[]) {
-  return runChatCompletion(messages, tools);
+export async function runAssistantTurn(
+  messages: ChatMessage[],
+  tools: ToolDefinition[],
+  options?: { toolChoice?: "auto" | "required" | "none" },
+) {
+  return runChatCompletion(messages, tools, { toolChoice: options?.toolChoice });
 }
 
 export async function runDevTurn(messages: ChatMessage[], tools: ToolDefinition[]) {

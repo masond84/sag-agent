@@ -136,6 +136,15 @@ export function isMem0Enabled(): boolean {
   return isMem0Configured();
 }
 
+export function getMem0InitError(): string | undefined {
+  return initError;
+}
+
+export interface AgentMemoryEntry {
+  id: string;
+  memory: string;
+}
+
 export function resolveMemoryUserId(chatId?: number | string): string {
   const override = process.env.SAG_USER_ID?.trim();
   if (override) {
@@ -264,6 +273,123 @@ export async function addAgentDiary(
   } catch (error) {
     logMem0Warn(`agent diary add failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+export async function addAgentSeedMemory(
+  text: string,
+  metadata?: Record<string, string>,
+): Promise<void> {
+  const client = await getBackend();
+  if (!client) {
+    throw new Error("Mem0 is not configured");
+  }
+
+  const agentId = resolveAgentId();
+
+  await client.add([{ role: "assistant", content: text }], {
+    agentId,
+    infer: false,
+    metadata: { source: "seed", type: "agent_persona", ...metadata },
+  });
+}
+
+export async function addUserSeedMemory(userId: string, text: string): Promise<void> {
+  const client = await getBackend();
+  if (!client) {
+    throw new Error("Mem0 is not configured");
+  }
+
+  await client.add([{ role: "user", content: text }], {
+    userId,
+    infer: false,
+    metadata: { source: "seed", type: "user_persona" },
+  });
+}
+
+async function fetchAgentMemoryEntries(limit = 50): Promise<AgentMemoryEntry[]> {
+  const client = await getBackend();
+  if (!client) {
+    return [];
+  }
+
+  const agentId = resolveAgentId();
+
+  let results: Array<{ id?: string; memory?: string }> = [];
+
+  if (client instanceof MemoryClient) {
+    const page = await client.getAll({
+      filters: mem0AgentFilters(agentId),
+      pageSize: limit,
+    });
+    results = page.results ?? [];
+  } else {
+    const page = await client.getAll({
+      filters: mem0AgentFilters(agentId),
+      topK: limit,
+    });
+    results = page.results ?? [];
+  }
+
+  return results
+    .filter((entry): entry is { id: string; memory: string } => Boolean(entry.id && entry.memory))
+    .map((entry) => ({ id: entry.id, memory: entry.memory }));
+}
+
+export async function listAgentMemoryEntries(limit = 50): Promise<AgentMemoryEntry[]> {
+  try {
+    return await fetchAgentMemoryEntries(limit);
+  } catch (error) {
+    logMem0Warn(`list agent entries failed: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
+}
+
+export async function deleteAgentMemory(memoryId: string): Promise<void> {
+  const client = await getBackend();
+  if (!client) {
+    throw new Error("Mem0 is not configured");
+  }
+
+  await client.delete(memoryId);
+}
+
+const GENERIC_AGENT_MEMORY_PATTERNS = [
+  /hanging out and keeping things ready/i,
+  /ready for any questions or tasks/i,
+  /night owl/i,
+  /operates when the user is active/i,
+  /stays in the background until needed/i,
+  /here to assist/i,
+  /keeping things interesting during the chat/i,
+  /monitoring tasks/i,
+  /when you need me/i,
+  /testing the new assistant/i,
+  /^user inquired/i,
+  /^user asked/i,
+  /^user is testing/i,
+  /conservice bill/i,
+  /^assistant (offers|provides|operates|says)/i,
+];
+
+export function isGenericAgentMemory(text: string): boolean {
+  return GENERIC_AGENT_MEMORY_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export async function purgeGenericAgentMemories(): Promise<{ deleted: number; kept: number }> {
+  const entries = await listAgentMemoryEntries(100);
+  let deleted = 0;
+  let kept = 0;
+
+  for (const entry of entries) {
+    if (isGenericAgentMemory(entry.memory)) {
+      await deleteAgentMemory(entry.id);
+      deleted += 1;
+    } else {
+      kept += 1;
+    }
+  }
+
+  return { deleted, kept };
 }
 
 export async function addExplicitMemory(userId: string, text: string): Promise<void> {

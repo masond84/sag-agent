@@ -34,14 +34,15 @@ async function processEmailSkills(skills: LoadedSkills, config: WorkerConfig): P
   for (const skill of skills.email) {
     log("info", `Checking email skill: ${skill.config.name}`);
 
-    const messages = await fetchMessages(skill.config.trigger.gmailQuery, 10);
-    log("debug", `Found ${messages.length} candidate message(s)`);
-    await logActivity("gmail_poll", `Polled ${skill.config.name}: ${messages.length} candidate(s)`, {
-      skill: skill.config.id,
-      candidates: messages.length,
-    });
+    try {
+      const messages = await fetchMessages(skill.config.trigger.gmailQuery, 10);
+      log("debug", `Found ${messages.length} candidate message(s)`);
+      await logActivity("gmail_poll", `Polled ${skill.config.name}: ${messages.length} candidate(s)`, {
+        skill: skill.config.id,
+        candidates: messages.length,
+      });
 
-    for (const message of messages) {
+      for (const message of messages) {
       if (!(await hasProcessed(message.id))) {
         if (!skill.matches(message)) {
           continue;
@@ -77,6 +78,14 @@ async function processEmailSkills(skills: LoadedSkills, config: WorkerConfig): P
       }
 
       log("debug", `Skipping already processed message ${message.id}`);
+    }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      log("error", formatGmailAuthError(error));
+      await logActivity("gmail_poll", `Gmail poll failed: ${detail.slice(0, 120)}`, {
+        skill: skill.config.id,
+        error: true,
+      });
     }
   }
 }

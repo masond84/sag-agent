@@ -18,6 +18,7 @@
     "test:memory": "tsx src/scripts/test-memory.ts",
     "test:activity": "tsx src/scripts/test-activity-log.ts",
     "test:reflection": "tsx src/scripts/test-reflection.ts",
+    "test:purge-agent-memories": "tsx src/scripts/test-purge-agent-memories.ts",
     "test:dev": "tsx src/scripts/test-dev.ts",
     "test:orchestrator": "tsx src/scripts/test-orchestrator.ts",
     "test:telegram": "tsx src/scripts/test-telegram.ts",
