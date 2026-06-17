@@ -2,7 +2,7 @@ import { Bot } from "grammy";
 import type { InteractiveSkillContext } from "../types.js";
 import { buildTelegramReply } from "./telegram-handlers.js";
 import { isTelegramConfigured } from "./notify.js";
-import { isAuthorizedChat } from "./telegram.js";
+import { isAuthorizedChat, splitTelegramMessage } from "./telegram.js";
 
 export type TelegramContextProvider = () => Promise<InteractiveSkillContext>;
 
@@ -33,9 +33,17 @@ export async function startTelegramBot(getContext: TelegramContextProvider): Pro
       return;
     }
 
-    const context = await getContext();
-    const reply = await buildTelegramReply(text, context, chatId);
-    await ctx.reply(reply);
+    try {
+      const context = await getContext();
+      const reply = await buildTelegramReply(text, context, chatId);
+      for (const chunk of splitTelegramMessage(reply)) {
+        await ctx.reply(chunk);
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error("[error] Telegram reply failed:", detail);
+      await ctx.reply("Something went wrong handling your message. Try again or use /help.");
+    }
   });
 
   await bot.api.deleteWebhook({ drop_pending_updates: false });

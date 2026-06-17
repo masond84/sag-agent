@@ -1,10 +1,22 @@
 import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parse } from "yaml";
+import { getRepoRoot } from "../assistant/repo-tools.js";
 
-const DATA_DIR = path.resolve(process.cwd(), "data");
-const PROFILE_FILE = path.join(DATA_DIR, "profile.yaml");
-const PROFILE_TEMPLATE = path.resolve(process.cwd(), "config/agent-profile.template.yaml");
+function getProfilePaths(): {
+  dataDir: string;
+  profileFile: string;
+  profileTemplate: string;
+  seedMarker: string;
+} {
+  const root = getRepoRoot();
+  return {
+    dataDir: path.join(root, "data"),
+    profileFile: path.join(root, "data/profile.yaml"),
+    profileTemplate: path.join(root, "config/agent-profile.template.yaml"),
+    seedMarker: path.join(root, "data/mem0/profile-seed.json"),
+  };
+}
 
 export interface AgentProfile {
   profileVersion?: number;
@@ -61,28 +73,58 @@ function appendBlock(lines: string[], label: string, value: unknown): void {
 }
 
 async function ensureProfileFile(): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
+  const { dataDir, profileFile, profileTemplate } = getProfilePaths();
+  await mkdir(dataDir, { recursive: true });
   try {
-    await stat(PROFILE_FILE);
+    await stat(profileFile);
+    return;
   } catch {
-    await copyFile(PROFILE_TEMPLATE, PROFILE_FILE);
+    // profile.yaml missing — seed from template
   }
+
+  try {
+    await stat(profileTemplate);
+  } catch {
+    throw new Error(`Profile template missing: ${profileTemplate}`);
+  }
+
+  await copyFile(profileTemplate, profileFile);
+}
+
+function normalizeProfile(parsed: unknown): AgentProfile {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {};
+  }
+  return parsed as AgentProfile;
 }
 
 export async function loadAgentProfile(): Promise<AgentProfile> {
   await ensureProfileFile();
-  const raw = await readFile(PROFILE_FILE, "utf8");
-  return parse(raw) as AgentProfile;
+  const { profileFile } = getProfilePaths();
+
+  let raw: string;
+  try {
+    raw = await readFile(profileFile, "utf8");
+  } catch (error) {
+    throw new Error(`Could not read profile file: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    return normalizeProfile(parse(raw));
+  } catch (error) {
+    throw new Error(`Invalid profile YAML: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
-export function formatProfileForPrompt(profile: AgentProfile): string {
+export function formatProfileForPrompt(profile: AgentProfile | null | undefined): string {
+  const safeProfile = normalizeProfile(profile);
   const lines: string[] = ["User profile (stable preferences — treat as ground truth):"];
-  const identity = profile.identity ?? {};
-  const communication = profile.communication ?? {};
-  const work = profile.work ?? {};
-  const preferences = profile.preferences ?? {};
-  const agentBehavior = profile.agent_behavior ?? {};
-  const personalContext = profile.personal_context ?? {};
+  const identity = safeProfile.identity ?? {};
+  const communication = safeProfile.communication ?? {};
+  const work = safeProfile.work ?? {};
+  const preferences = safeProfile.preferences ?? {};
+  const agentBehavior = safeProfile.agent_behavior ?? {};
+  const personalContext = safeProfile.personal_context ?? {};
 
   appendScalar(lines, "Name", identity.name);
   appendScalar(lines, "Role", identity.role);
@@ -110,10 +152,10 @@ export function formatProfileForPrompt(profile: AgentProfile): string {
   appendBlock(lines, "Spec structure", work.spec_style);
   appendBlock(lines, "Handoff style", work.handoff_style);
 
-  appendList(lines, "Operating principles", profile.operating_principles);
+  appendList(lines, "Operating principles", safeProfile.operating_principles);
 
-  if (profile.business_goals && typeof profile.business_goals === "object") {
-    for (const [horizon, goals] of Object.entries(profile.business_goals)) {
+  if (safeProfile.business_goals && typeof safeProfile.business_goals === "object") {
+    for (const [horizon, goals] of Object.entries(safeProfile.business_goals)) {
       appendList(lines, `Business goals (${horizon.replace(/_/g, " ")})`, goals);
     }
   }
@@ -158,15 +200,15 @@ export async function getProfileSeedText(): Promise<string> {
 
 export async function getProfileFileMtimeMs(): Promise<number> {
   await ensureProfileFile();
-  const fileStat = await stat(PROFILE_FILE);
+  const { profileFile } = getProfilePaths();
+  const fileStat = await stat(profileFile);
   return fileStat.mtimeMs;
 }
 
-const SEED_MARKER = path.join(DATA_DIR, "mem0", "profile-seed.json");
-
 export async function getProfileSeedState(): Promise<{ mtimeMs: number } | null> {
+  const { seedMarker } = getProfilePaths();
   try {
-    const raw = await readFile(SEED_MARKER, "utf8");
+    const raw = await readFile(seedMarker, "utf8");
     return JSON.parse(raw) as { mtimeMs: number };
   } catch {
     return null;
@@ -174,6 +216,7 @@ export async function getProfileSeedState(): Promise<{ mtimeMs: number } | null>
 }
 
 export async function markProfileSeeded(mtimeMs: number): Promise<void> {
-  await mkdir(path.dirname(SEED_MARKER), { recursive: true });
-  await writeFile(SEED_MARKER, JSON.stringify({ mtimeMs }, null, 2));
+  const { seedMarker } = getProfilePaths();
+  await mkdir(path.dirname(seedMarker), { recursive: true });
+  await writeFile(seedMarker, JSON.stringify({ mtimeMs }, null, 2));
 }
