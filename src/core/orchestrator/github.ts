@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getRepoRoot } from "../assistant/repo-tools.js";
-import { mergePullRequest } from "../dev/git.js";
+import { mergePullRequest, type PullRequestMergeResult } from "../dev/git.js";
 import { getCloudPollIntervalMs, getCloudTimeoutMs } from "./config.js";
 
 const execFileAsync = promisify(execFile);
@@ -69,6 +69,6 @@ export async function getPullRequestSummary(prNumber: number): Promise<string> {
   }
 }
 
-export async function autoMergePullRequest(prNumber: number): Promise<{ merged: boolean; title: string; wasDraft?: boolean }> {
+export async function autoMergePullRequest(prNumber: number): Promise<PullRequestMergeResult> {
   return mergePullRequest(prNumber);
 }

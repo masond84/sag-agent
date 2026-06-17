@@ -68,7 +68,17 @@ export async function executeDevTool(name: string, argsJson: string, session: De
     case "merge_pull_request":
       if (!session.buildPassed) return "Run run_build first.";
       if (session.mergedPrs.length >= Number(process.env.DEV_MAX_MERGES_PER_RUN ?? 3)) return "Merge limit reached.";
-      { const r = await mergePullRequest(Number(args.pr_number)); if (r.merged) { session.mergedPrs.push(Number(args.pr_number)); session.buildPassed = false; } return r.merged ? `Merged #${args.pr_number}` : `PR #${args.pr_number} not open.`; }
+      {
+        const r = await mergePullRequest(Number(args.pr_number));
+        if (r.merged) {
+          session.mergedPrs.push(Number(args.pr_number));
+          session.buildPassed = false;
+          return `Merged #${args.pr_number}${r.wasDraft ? " (was draft, marked ready)" : ""}`;
+        }
+        return r.wasDraft
+          ? `PR #${args.pr_number} not merged (${r.title}) after marking ready.`
+          : `PR #${args.pr_number} not open (${r.title}).`;
+      }
     case "list_open_prs": return listOpenPullRequests();
     case "recent_merges": return getRecentMerges();
     case "complete_dev_run":
