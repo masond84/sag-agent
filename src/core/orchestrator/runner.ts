@@ -74,13 +74,17 @@ export async function runOrchestratorCycle(trigger: DevTrigger): Promise<Orchest
     const merge = await autoMergePullRequest(pr.number);
     if (merge.merged) {
       mergedPrs.push(pr.number);
-      briefParts.push(`Merged PR #${pr.number}: ${merge.title}`);
+      briefParts.push(
+        `Merged PR #${pr.number}: ${merge.title}${merge.wasDraft ? " (was draft, marked ready)" : ""}`,
+      );
       if (isPostMergeAuditEnabled()) {
         await queuePostMergeScan(pr.number, merge.title);
         briefParts.push("Queued post-merge audit.");
       }
     } else {
-      briefParts.push(`PR #${pr.number} was not open for merge (${merge.title}).`);
+      briefParts.push(
+        `PR #${pr.number} was not merged (${merge.title})${merge.wasDraft ? " after marking ready" : ""}.`,
+      );
     }
   } else {
     briefParts.push(`PR ready for review: ${pr.url}`);
