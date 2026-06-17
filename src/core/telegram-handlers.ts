@@ -6,6 +6,7 @@ import {
   isGeneralConversation,
   isDevTaskRequest,
   extractDevTask,
+  isVagueDevConfirmation,
 } from "./message-routing.js";
 import { respondToAssistantMessage } from "./assistant/respond.js";
 import { getDevStatus } from "./dev/status.js";
@@ -13,7 +14,7 @@ import { isDevRunnerEnabled, queueManualDevTask } from "./dev/state.js";
 import { isCursorOrchestratorMode } from "./orchestrator/config.js";
 import { runDevCycle } from "./dev/runner.js";
 import { formatSkillCatalog } from "./skill-catalog.js";
-import { clearConversation } from "./memory/conversation.js";
+import { clearConversation, formatConversationHighlights } from "./memory/conversation.js";
 import {
   addExplicitMemory,
   listAgentMemories,
@@ -35,6 +36,20 @@ import type { InteractiveSkillContext } from "../types.js";
 
 function formatSkillsList(context: InteractiveSkillContext): string {
   return formatSkillCatalog(context.skills);
+}
+
+async function resolveManualDevTask(text: string, memoryUserId: string): Promise<{ task: string; taskContext?: string }> {
+  const task = extractDevTask(text);
+  if (!isVagueDevConfirmation(task)) {
+    return { task };
+  }
+
+  const highlights = await formatConversationHighlights(memoryUserId, 8);
+  if (highlights === "No prior conversation in this thread.") {
+    return { task };
+  }
+
+  return { task, taskContext: highlights };
 }
 
 export function formatHelp(): string {
@@ -103,7 +118,8 @@ async function handleDevCommand(text: string): Promise<string> {
     }
     const task = rest.slice("run".length).trim();
     if (task) {
-      await queueManualDevTask(task);
+      const resolved = await resolveManualDevTask(task, resolveMemoryUserId());
+      await queueManualDevTask(resolved.task, resolved.taskContext);
       const modeHint = isCursorOrchestratorMode()
         ? "Linear ticket + Cursor Cloud agent will run on the next dev cycle."
         : "Local dev agent will run on the next dev cycle.";
@@ -189,12 +205,14 @@ export async function buildTelegramReply(
   }
 
   if (isDevRunnerEnabled() && isDevTaskRequest(text)) {
-    const task = extractDevTask(text);
-    await queueManualDevTask(task);
+    const resolved = await resolveManualDevTask(text, memoryUserId);
+    await queueManualDevTask(resolved.task, resolved.taskContext);
     const modeHint = isCursorOrchestratorMode()
       ? "I'll create a Linear ticket and launch Cursor Cloud."
       : "I'll queue the local dev agent.";
-    return `Got it — ${modeHint} Task: "${task.slice(0, 120)}${task.length > 120 ? "…" : ""}"`;
+    const preview = resolved.task.slice(0, 120);
+    const contextNote = resolved.taskContext ? " (including recent chat context)" : "";
+    return `Got it — ${modeHint} Task: "${preview}${resolved.task.length > 120 ? "…" : ""}"${contextNote}`;
   }
 
   const pendingSlot = await getPendingReplySlot();

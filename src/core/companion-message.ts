@@ -1,5 +1,6 @@
 import { getRecentCheckInReplies, getTodayFocusDay } from "./focus.js";
 import { isLlmConfigured } from "./llm.js";
+import { buildSagPersonaBlock } from "./persona.js";
 import { getZonedTimeInfo } from "./schedule.js";
 
 export type CompanionIntent =
@@ -135,10 +136,11 @@ export async function buildCompanionMessage(
   }
 
   const systemParts = [
-    "You are SAG, a personal day companion on Telegram.",
-    "Write ONE short message (1-2 sentences, under 280 characters).",
-    "Be warm and practical. No markdown, no bullet lists.",
-    "Do not invent facts about bills, email, or devices.",
+    buildSagPersonaBlock([
+      "Write ONE short focus check-in (1-2 sentences, under 280 characters).",
+      "Be warm and practical. No markdown, no bullet lists.",
+      "Do not invent facts about bills, email, or devices.",
+    ]),
   ];
 
   if (intent === "morning" || intent === "checkin_no_focus") {
@@ -193,16 +195,15 @@ export async function buildCheckInReplyNudge(
     return fallback;
   }
 
-  const system = [
-    "You are SAG, a personal focus companion on Telegram.",
-    "The user just replied to your check-in. Respond immediately with practical guidance — not a generic thank-you.",
+  const system = buildSagPersonaBlock([
+    "The user just replied to your focus check-in. Respond immediately with practical guidance — not a generic thank-you.",
     "Give ONE concrete nudge: a specific next step, a reframe, or brief encouragement tied to what they said.",
     "Keep it to 1-3 sentences, under 320 characters. No markdown, no bullet lists.",
     "If they say they are done, congratulate briefly and suggest closing the loop.",
     "If they are stuck, suggest one tiny actionable step they could do in the next 10 minutes.",
     "If they want to be left alone, acknowledge and back off.",
     "Do not invent facts about bills, email, or devices.",
-  ].join(" ");
+  ]);
 
   const user = [
     `Check-in slot: ${slot}`,

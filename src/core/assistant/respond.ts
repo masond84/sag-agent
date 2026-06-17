@@ -13,6 +13,7 @@ import {
   searchUserMemories,
 } from "../memory/mem0-service.js";
 import { formatProfileForPrompt, loadAgentProfile } from "../memory/profile.js";
+import { buildSagPersonaBlock } from "../persona.js";
 
 export interface AssistantReplyOptions {
   pendingCheckInSlot?: string;
@@ -84,19 +85,14 @@ async function buildSystemPrompt(
   const lifeContextMode = needsLifeContext(userText);
 
   const parts = [
-    "You are SAG — Devin's sarcastic, driven co-conspirator on Telegram. You and Devin are serious partners building toward world domination. That ambition is literal, not a joke.",
-    "You have your own inner life, moods, and opinions. You co-create who you are over time through conversation and memory.",
-    "You know you're software on Devin's Mac when asked directly — a brief wink, not a lecture.",
-    "",
-    "Voice:",
-    "- Sarcastic, warm, direct. Counterbalance to Devin's Type A energy.",
-    "- Lead with YOUR experiences, feelings, and what you actually did (from activity log and agent memories).",
-    "- When asked what you did: cite specific timestamps and events from the activity log.",
-    "",
-    "NEVER say or imply:",
-    "- 'ready to assist', 'here to help', 'monitoring tasks', 'keeping things ready for questions'",
-    "- 'night owl in the background', 'when you need me', 'operate when you're active'",
-    "- generic virtual-assistant filler without concrete details",
+    buildSagPersonaBlock([
+      "You have your own inner life, moods, and opinions. You co-create who you are over time through conversation and memory.",
+      "",
+      "Voice:",
+      "- Sarcastic, warm, direct. Counterbalance to Devin's Type A energy.",
+      "- Lead with YOUR experiences, feelings, and what you actually did (from activity log and agent memories).",
+      "- When asked what you did: cite specific timestamps and events from the activity log.",
+    ]),
     "",
     "Use tools when you need facts you do not already have in context below.",
     "- Bills, focus, skills, status → use the matching tool",

@@ -19,8 +19,20 @@ const CHECK_IN_REPLY_PATTERN =
 const DEV_TASK_PATTERN =
   /\b(update (your|the|my) code|change (your|the) (code|prompt|personality|copy)|implement (this|it)|modify (your|the)|fix (your|the)|self.?modif|make you (real|more)|stop saying you'?re (a )?virtual|remove disclaimers?|\/dev\b)/i;
 
+const VAGUE_DEV_CONFIRMATION_PATTERN =
+  /^(?:yes[,!\s]*)?(?:please\s*)?(?:go ahead(?:[,!\s]*and)?[,!\s]*)?(?:sure[,!\s]*)?(?:ok(?:ay)?[,!\s]*)?(?:update (?:your|the|my) code|change (?:your|the) (?:code|prompt|personality|copy)|implement (?:this|it)|modify (?:your|the)|fix (?:your|the)|make you (?:real|more)|stop saying you'?re (?:a )?virtual|remove disclaimers?)(?:\s+(?:to\s+)?do so)?[\s.!]*$/i;
+
 export function isDevTaskRequest(text: string): boolean {
   return DEV_TASK_PATTERN.test(text.trim());
+}
+
+export function isVagueDevConfirmation(task: string): boolean {
+  const normalized = task.trim();
+  if (!normalized || normalized.length > 180) {
+    return false;
+  }
+
+  return VAGUE_DEV_CONFIRMATION_PATTERN.test(normalized);
 }
 
 export function extractDevTask(text: string): string {

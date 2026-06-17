@@ -11,6 +11,8 @@ export interface DevTrigger {
   prNumber?: number;
   prTitle?: string;
   task?: string;
+  /** Recent Telegram thread context when the task is a vague confirmation. */
+  taskContext?: string;
   queuedAt: string;
 }
 
@@ -93,11 +95,12 @@ export async function recoverOrphanedDevLock(): Promise<boolean> {
   return true;
 }
 
-export async function queueManualDevTask(task: string): Promise<void> {
+export async function queueManualDevTask(task: string, taskContext?: string): Promise<void> {
   const state = await readDevState();
   state.pendingTriggers.push({
     kind: "manual",
     task: task.trim(),
+    ...(taskContext?.trim() ? { taskContext: taskContext.trim() } : {}),
     queuedAt: new Date().toISOString(),
   });
   await writeDevState(state);
