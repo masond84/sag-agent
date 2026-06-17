@@ -153,11 +153,6 @@ export function loadWorkerConfig(): WorkerConfig {
   }; 
 }
 
-// Type guard for identifying if a configuration is Email-specific.
-export function isEmailSkillConfig(config: SkillConfig): config is EmailSkillConfig {
-  return config.kind !== "scheduled" && config.kind !== "interactive";
-}
-
 // Type guard for identifying if a configuration is Scheduled-specific.
 export function isScheduledSkillConfig(config: SkillConfig): config is ScheduledSkillConfig {
   return config.kind === "scheduled";

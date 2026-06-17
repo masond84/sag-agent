@@ -68,10 +68,3 @@ export function hasReachedDailyTime(
 
   return true;
 }
-
-export function formatTime12Hour(time24: string): string {
-  const { hour, minute } = parseTimeHHMM(time24);
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const hour12 = hour % 12 || 12;
-  return `${hour12}:${minute.toString().padStart(2, "0")} ${suffix}`;
-}
