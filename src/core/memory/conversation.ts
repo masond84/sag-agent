@@ -59,3 +59,26 @@ export async function appendConversationTurn(
 export async function clearConversation(userId: string): Promise<void> {
   await writeThread({ userId, updatedAt: new Date().toISOString(), messages: [] });
 }
+
+export async function formatConversationHighlights(userId: string, maxTurns = 6): Promise<string> {
+  const thread = await readThread(userId);
+  const conversational = thread.messages.filter(
+    (message) => message.role === "user" || message.role === "assistant",
+  );
+
+  if (conversational.length === 0) {
+    return "No prior conversation in this thread.";
+  }
+
+  const recent = conversational.slice(-maxTurns * 2);
+  const lines = recent.map((message) => {
+    const speaker = message.role === "user" ? "User" : "SAG";
+    const content =
+      typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+    return `${speaker}: ${content.slice(0, 300)}`;
+  });
+
+  return [`Thread last updated: ${thread.updatedAt.slice(0, 16).replace("T", " ")}`, ...lines].join(
+    "\n",
+  );
+}
