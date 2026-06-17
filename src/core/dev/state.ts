@@ -84,6 +84,15 @@ export async function releaseDevLock(): Promise<void> {
   await writeDevState(state);
 }
 
+/** Clear a lock left behind when launchctl restarted the worker mid-run. */
+export async function recoverOrphanedDevLock(): Promise<boolean> {
+  const state = await readDevState();
+  if (!state.runningSince) return false;
+  delete state.runningSince;
+  await writeDevState(state);
+  return true;
+}
+
 export async function queueManualDevTask(task: string): Promise<void> {
   const state = await readDevState();
   state.pendingTriggers.push({
