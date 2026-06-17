@@ -80,20 +80,29 @@ export async function createPullRequest(title: string, body: string): Promise<{ 
   return { number, url };
 }
 
-export async function mergePullRequest(prNumber: number): Promise<{ merged: boolean; title: string; wasDraft?: boolean }> {
+export interface PullRequestMergeResult {
+  merged: boolean;
+  title: string;
+  wasDraft: boolean;
+}
+
+export async function mergePullRequest(prNumber: number): Promise<PullRequestMergeResult> {
   const info = JSON.parse(await gh(["pr", "view", String(prNumber), "--json", "title,state,isDraft"])) as {
     title: string;
     state: string;
     isDraft: boolean;
   };
   if (info.state !== "OPEN") {
-    return { merged: false, title: info.title };
+    return { merged: false, title: info.title, wasDraft: false };
   }
 
-  let wasDraft = false;
-  if (info.isDraft) {
-    await gh(["pr", "ready", String(prNumber)]);
-    wasDraft = true;
+  const wasDraft = info.isDraft;
+  if (wasDraft) {
+    try {
+      await gh(["pr", "ready", String(prNumber)]);
+    } catch {
+      return { merged: false, title: info.title, wasDraft: true };
+    }
   }
 
   try {
