@@ -1,5 +1,6 @@
 import type { ChatMessage } from "../llm.js";
 import { isLlmConfigured, runDevTurn } from "../llm.js";
+import { formatManualTask } from "../orchestrator/prompts.js";
 import type { DevTrigger } from "./state.js";
 import { devTools, executeDevTool, type DevSession } from "./tools.js";
 
@@ -8,7 +9,7 @@ function buildTriggerPrompt(trigger: DevTrigger): string {
     return `Post-merge follow-up for PR #${trigger.prNumber}. Review and implement follow-ups.`;
   }
   if (trigger.kind === "manual") {
-    return trigger.task ?? "Run dev task.";
+    return formatManualTask(trigger);
   }
   return "Scheduled audit — make small improvements as you see fit.";
 }

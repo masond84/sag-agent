@@ -2,6 +2,21 @@ import type { DevTrigger } from "../dev/state.js";
 import type { LinearIssueRef } from "./linear-client.js";
 import { formatGuardrails, getGithubRepo } from "./config.js";
 
+export function formatManualTask(trigger: DevTrigger): string {
+  const task = trigger.task?.trim() || "Implement requested change.";
+  const context = trigger.taskContext?.trim();
+  if (!context) {
+    return task;
+  }
+
+  return [
+    task,
+    "",
+    "Recent Telegram conversation (implement what SAG proposed or what the user asked for before this confirmation):",
+    context,
+  ].join("\n");
+}
+
 function baseContext(linearIssue?: Pick<LinearIssueRef, "identifier" | "url">): string {
   const lines = [`Repository: ${getGithubRepo()}`, formatGuardrails()];
   if (linearIssue) lines.push(`Linear issue: ${linearIssue.identifier} (${linearIssue.url})`);
@@ -73,8 +88,9 @@ export function buildOrchestratorPrompt(
     return { title, prompt: buildPostMergePrompt(trigger.prNumber ?? 0, trigger.prTitle, linearIssue) };
   }
   if (trigger.kind === "manual") {
-    const task = trigger.task?.trim() || "Implement requested change.";
-    const title = task.length > 80 ? `${task.slice(0, 77)}...` : task;
+    const task = formatManualTask(trigger);
+    const titleSource = trigger.task?.trim() || "Implement requested change.";
+    const title = titleSource.length > 80 ? `${titleSource.slice(0, 77)}...` : titleSource;
     return { title, prompt: buildImplementationPrompt(task, linearIssue) };
   }
   return { title: "Scheduled SAG audit", prompt: buildCadencePrompt(linearIssue) };

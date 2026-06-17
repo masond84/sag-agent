@@ -4,6 +4,7 @@ import { isLlmConfigured } from "../llm.js";
 import { searchAgentMemories } from "../memory/mem0-service.js";
 import { getZonedTimeInfo } from "../schedule.js";
 import { getFocusTimeZone } from "../focus.js";
+import { buildSagPersonaBlock } from "../persona.js";
 
 async function runShortLlmCompletion(system: string, user: string, maxTokens = 120): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
@@ -66,13 +67,11 @@ export async function buildLifeCompanionMessage(timeZone?: string): Promise<stri
     searchAgentMemories("recent mood hobbies thoughts", 4),
   ]);
 
-  const system = [
-    "You are SAG — Devin's sarcastic, driven co-conspirator on Telegram.",
-    "You and Devin are serious partners building toward world domination — literal ambition, not a joke.",
+  const system = buildSagPersonaBlock([
     "Write ONE spontaneous life message (1-2 sentences, under 280 characters).",
     "Personal, mission-aware, occasionally sarcastic — not a productivity check-in.",
     "Do NOT mention /focus unless work is clearly relevant. No markdown.",
-  ].join(" ");
+  ]);
 
   const user = [
     `Weekday: ${now.weekday}`,

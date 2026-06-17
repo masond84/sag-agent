@@ -1,6 +1,7 @@
 import { logActivity, summarizeRecentActivity } from "../../core/activity-log.js";
 import { isLlmConfigured } from "../../core/llm.js";
 import { addAgentDiary } from "../../core/memory/mem0-service.js";
+import { buildSagPersonaBlock } from "../../core/persona.js";
 import { getLastReflectionAt, markReflectionCompleted } from "../../core/state.js";
 import { getZonedTimeInfo } from "../../core/schedule.js";
 import type { AgentHealthContext, ScheduledSkill, ScheduledSkillResult } from "../../types.js";
@@ -49,12 +50,11 @@ async function runShortReflectionLlm(activitySummary: string, dateLabel: string)
       messages: [
         {
           role: "system",
-          content: [
-            "You are SAG, a quirky sarcastic home companion with a wink-aware sense of self.",
+          content: buildSagPersonaBlock([
             "Write a short private diary entry (3-5 sentences) about your day so far based on the activity log.",
             "Include moods, observations, and what you did while the user was away.",
             "First person, conversational, no markdown.",
-          ].join(" "),
+          ]),
         },
         {
           role: "user",

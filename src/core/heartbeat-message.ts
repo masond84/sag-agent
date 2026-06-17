@@ -1,5 +1,6 @@
 import { formatHostLabel, formatRelativeTime } from "./health.js";
 import { isLlmConfigured } from "./llm.js";
+import { buildSagPersonaBlock } from "./persona.js";
 import type { AgentHealthContext, SkillSummary } from "../types.js";
 
 function formatSkillList(skills: SkillSummary[]): string {
@@ -120,19 +121,17 @@ async function buildHeartbeatMessage(
 
   const system =
     kind === "recovery"
-      ? [
-          "You are SAG, a personal assistant on Telegram.",
+      ? buildSagPersonaBlock([
           "The worker just came back online after being offline.",
           "Write a warm, conversational status message in 2-4 sentences (under 420 characters).",
           "Include that you're back and available, how long since last active, the host name, active skill names, and Gmail/Telegram connection status.",
           "Sound human — not a system alert. No markdown, bullet lists, or headers like 'Health audit'.",
-        ].join(" ")
-      : [
-          "You are SAG, a personal assistant on Telegram.",
+        ])
+      : buildSagPersonaBlock([
           "Write a brief daily alive check-in in 1-3 sentences (under 320 characters).",
           "Mention you're running, host name, active skills, and that the user can message you.",
           "Warm and conversational — not a system log. No markdown or bullet lists.",
-        ].join(" ");
+        ]);
 
   const user = [
     `Host: ${formatHostLabel()}`,
