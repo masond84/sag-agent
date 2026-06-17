@@ -1,6 +1,6 @@
 import { LinearClient } from "@linear/sdk";
 import type { DevTriggerKind } from "../dev/state.js";
-import { getLinearApiKey, getLinearProjectName, getLinearTeamKey } from "./config.js";
+import { getGithubRepo, getLinearApiKey, getLinearProjectName, getLinearTeamKey } from "./config.js";
 
 export interface LinearIssueRef {
   id: string;
@@ -23,6 +23,7 @@ const ORCHESTRATOR_LABELS = ["orchestrator", "implementation", "post-merge-audit
 
 let cachedTeamId: string | undefined;
 let cachedProjectId: string | undefined;
+let cachedDoneStateId: string | undefined;
 const cachedLabelIds = new Map<string, string>();
 
 function getClient(): LinearClient {
@@ -73,6 +74,36 @@ async function resolveIssueLabelIds(kind: DevTriggerKind, teamId: string): Promi
     if (id) ids.push(id);
   }
   return ids;
+}
+
+export async function resolveDoneStateId(): Promise<string> {
+  if (cachedDoneStateId) return cachedDoneStateId;
+  const teamId = await resolveLinearTeamId();
+  const state = (await getClient().workflowStates({
+    filter: { team: { id: { eq: teamId } }, type: { eq: "completed" } },
+  })).nodes[0];
+  if (!state?.id) throw new Error('Linear "Done" workflow state not found for team.');
+  cachedDoneStateId = state.id;
+  return state.id;
+}
+
+export async function completeLinearIssue(
+  issue: Pick<LinearIssueRef, "id" | "identifier">,
+  details?: { mergedPrNumbers?: number[] },
+): Promise<void> {
+  const client = getClient();
+  const stateId = await resolveDoneStateId();
+  await client.updateIssue(issue.id, { stateId });
+
+  const merged = details?.mergedPrNumbers?.filter((n) => Number.isFinite(n)) ?? [];
+  if (merged.length === 0) return;
+
+  const repo = getGithubRepo();
+  const lines = [
+    "SAG orchestrator completed after merge.",
+    ...merged.map((n) => `- PR #${n}: https://github.com/${repo}/pull/${n}`),
+  ];
+  await client.createComment({ issueId: issue.id, body: lines.join("\n") });
 }
 
 export async function createLinearIssue(title: string, description: string, kind: DevTriggerKind): Promise<LinearIssueRef> {

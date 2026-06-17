@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { LinearIssueRef } from "../orchestrator/linear-client.js";
 import { isCursorOrchestratorMode } from "../orchestrator/config.js";
 import { runOrchestratorCycle } from "../orchestrator/runner.js";
 import { runDevAgent } from "./agent.js";
@@ -12,6 +13,7 @@ export interface DevCycleResult {
   notify: boolean;
   trigger: DevTrigger;
   mergedPrs: number[];
+  linearIssue?: LinearIssueRef;
 }
 
 export async function runDevCycle(force = false): Promise<DevCycleResult | null> {
@@ -37,7 +39,13 @@ export async function runDevCycle(force = false): Promise<DevCycleResult | null>
         mergedPrs: result.mergedPrs,
         filesChanged: [],
       });
-      return { brief: result.brief, notify: result.notify, trigger, mergedPrs: result.mergedPrs };
+      return {
+        brief: result.brief,
+        notify: result.notify,
+        trigger,
+        mergedPrs: result.mergedPrs,
+        linearIssue: result.linearIssue,
+      };
     }
 
     const result = await runDevAgent(trigger);

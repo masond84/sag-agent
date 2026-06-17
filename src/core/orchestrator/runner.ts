@@ -7,7 +7,7 @@ import {
 } from "./config.js";
 import { runCursorCloudAgent } from "./cursor-cloud.js";
 import { autoMergePullRequest, getPullRequestSummary, waitForPullRequest } from "./github.js";
-import { createLinearIssue } from "./linear-client.js";
+import { createLinearIssue, type LinearIssueRef } from "./linear-client.js";
 import { buildOrchestratorPrompt } from "./prompts.js";
 
 export interface OrchestratorCycleResult {
@@ -15,7 +15,7 @@ export interface OrchestratorCycleResult {
   notify: boolean;
   trigger: DevTrigger;
   mergedPrs: number[];
-  linearIssueUrl?: string;
+  linearIssue?: LinearIssueRef;
   cursorAgentId?: string;
   prUrl?: string;
 }
@@ -45,7 +45,7 @@ export async function runOrchestratorCycle(trigger: DevTrigger): Promise<Orchest
   ].filter(Boolean).join("\n");
 
   const linearIssue = await createLinearIssue(title, linearDescription, trigger.kind);
-  const cloudPrompt = buildOrchestratorPrompt(trigger, linearIssue.url).prompt;
+  const cloudPrompt = buildOrchestratorPrompt(trigger, linearIssue).prompt;
   const cloud = await runCursorCloudAgent(cloudPrompt);
   const pr = await waitForPullRequest({ prUrl: cloud.prUrl, branch: cloud.branch });
   const mergedPrs: number[] = [];
@@ -63,7 +63,7 @@ export async function runOrchestratorCycle(trigger: DevTrigger): Promise<Orchest
       notify: true,
       trigger,
       mergedPrs,
-      linearIssueUrl: linearIssue.url,
+      linearIssue,
       cursorAgentId: cloud.agentId,
     };
   }
@@ -95,7 +95,7 @@ export async function runOrchestratorCycle(trigger: DevTrigger): Promise<Orchest
     notify: true,
     trigger,
     mergedPrs,
-    linearIssueUrl: linearIssue.url,
+    linearIssue,
     cursorAgentId: cloud.agentId,
     prUrl: pr.url,
   };

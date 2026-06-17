@@ -2,6 +2,7 @@ import type { AgentHealthContext, ScheduledSkill, ScheduledSkillResult } from ".
 import { refreshWorkerAfterMerge } from "../../core/dev/restart.js";
 import { runDevCycle } from "../../core/dev/runner.js";
 import { isDevRunnerEnabled } from "../../core/dev/state.js";
+import { completeLinearIssue } from "../../core/orchestrator/linear-client.js";
 import { isTelegramConfigured, sendNotification } from "../../core/notify.js";
 
 export const devRunnerSkill: ScheduledSkill = {
@@ -20,6 +21,16 @@ export const devRunnerSkill: ScheduledSkill = {
     if (result.mergedPrs.length > 0) {
       if (isTelegramConfigured()) {
         await sendNotification(message);
+      }
+      if (result.linearIssue) {
+        try {
+          await completeLinearIssue(result.linearIssue, { mergedPrNumbers: result.mergedPrs });
+        } catch (error) {
+          console.error(
+            `[error] Linear complete failed for ${result.linearIssue.identifier}:`,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       }
       await refreshWorkerAfterMerge();
       return null;
