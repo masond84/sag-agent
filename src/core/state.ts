@@ -9,7 +9,6 @@ interface AgentState {
   lastRunAt?: string;
   lastHeartbeatReportAt?: string;
   lastWatchdogAlertAt?: string;
-  telegramUpdateOffset?: number;
   lastMorningBriefingDate?: string;
 }
 
@@ -81,17 +80,6 @@ export async function getLastWatchdogAlertAt(): Promise<string | undefined> {
 export async function markWatchdogAlerted(): Promise<void> {
   const state = await readState();
   state.lastWatchdogAlertAt = new Date().toISOString();
-  await writeState(state);
-}
-
-export async function getTelegramUpdateOffset(): Promise<number | undefined> {
-  const state = await readState();
-  return state.telegramUpdateOffset;
-}
-
-export async function setTelegramUpdateOffset(offset: number): Promise<void> {
-  const state = await readState();
-  state.telegramUpdateOffset = offset;
   await writeState(state);
 }
 
