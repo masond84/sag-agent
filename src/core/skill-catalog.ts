@@ -4,7 +4,8 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
   "conservice-statement":
     "Watches Gmail for Conservice utility statements and texts you a charge summary on Telegram.",
   "focus-companion":
-    "Day companion — scheduled check-ins and /focus to track what you are working on.",
+    "Unified companion — work focus check-ins at anchor hours plus random personal life texts during the day.",
+  reflection: "Distills the activity log into SAG's own Mem0 diary (agent memories).",
   heartbeat: "Keeps the worker monitored and sends a conversational status when SAG comes back online.",
   "telegram-commands": "This chat — answer questions, look up bills and focus, and run slash commands.",
   "morning-briefing": "Optional daily morning greeting at a configured time.",
@@ -25,7 +26,7 @@ export function formatSkillCatalog(skills: SkillSummary[]): string {
   }
 
   lines.push("");
-  lines.push("Slash commands: /help, /skills, /status, /focus, /ping");
+  lines.push("Slash commands: /help, /skills, /status, /focus, /memories, /sag-memories, /ping");
 
   return lines.join("\n");
 }
