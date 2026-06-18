@@ -19,11 +19,45 @@ const CHECK_IN_REPLY_PATTERN =
 const DEV_TASK_PATTERN =
   /\b(update (your|the|my) code|change (your|the) (code|prompt|personality|copy)|implement (this|it)|modify (your|the)|fix (your|the)|self.?modif|make you (real|more)|stop saying you'?re (a )?virtual|remove disclaimers?|\/dev\b)/i;
 
+const SELF_IMPROVEMENT_DEV_PATTERN =
+  /\b(make yourself better|improve yourself|learn from (?:our|the|past|recent)|based on (?:our|the|past|recent) (?:conversation|interaction|chat)s?|update yourself|better based on|try to make yourself)\b/i;
+
+const SHORT_DEV_AFFIRMATION_PATTERN =
+  /^(?:yes[,!\s]*)?(?:please\s*)?(?:go ahead(?:[,!\s]*and)?[,!\s]*)?(?:sure[,!\s]*)?(?:ok(?:ay)?[,!\s]*)?(?:yep[,!\s]*)?(?:(?:sounds good|that works)(?:[,!\s]*(?:do (?:it|so)|please))?|do (?:it|so)|go for it|please do that|make it (?:so|happen))[\s.!]*$/i;
+
+const DEV_PROPOSAL_CONTEXT_PATTERN =
+  /\b(update (?:your|the|my) code|change (?:your|the) (?:code|prompt|personality|copy)|implement|modify|fix (?:your|the)|persona|make you|stop saying|remove disclaim|improve|better|proposal|pull request|\bpr\b|\/dev|want me to|shall i|i can (?:update|change|fix|add))\b/i;
+
 const VAGUE_DEV_CONFIRMATION_PATTERN =
-  /^(?:yes[,!\s]*)?(?:please\s*)?(?:go ahead(?:[,!\s]*and)?[,!\s]*)?(?:sure[,!\s]*)?(?:ok(?:ay)?[,!\s]*)?(?:update (?:your|the|my) code|change (?:your|the) (?:code|prompt|personality|copy)|implement (?:this|it)|modify (?:your|the)|fix (?:your|the)|make you (?:real|more)|stop saying you'?re (?:a )?virtual|remove disclaimers?)(?:\s+(?:to\s+)?do so)?[\s.!]*$/i;
+  /^(?:yes[,!\s]*)?(?:please\s*)?(?:go ahead(?:[,!\s]*and)?[,!\s]*)?(?:sure[,!\s]*)?(?:ok(?:ay)?[,!\s]*)?(?:yep[,!\s]*)?(?:update (?:your|the|my) code|change (?:your|the) (?:code|prompt|personality|copy)|implement (?:this|it)|modify (?:your|the)|fix (?:your|the)|make you (?:real|more)|stop saying you'?re (?:a )?virtual|remove disclaimers?|(?:(?:sounds good|that works)(?:[,!\s]*(?:do (?:it|so)|please))?|do (?:it|so)|go for it|please do that|make it (?:so|happen)))(?:\s+(?:to\s+)?do so)?[\s.!]*$/i;
 
 export function isDevTaskRequest(text: string): boolean {
-  return DEV_TASK_PATTERN.test(text.trim());
+  const normalized = text.trim();
+  return DEV_TASK_PATTERN.test(normalized) || SELF_IMPROVEMENT_DEV_PATTERN.test(normalized);
+}
+
+export function isShortDevAffirmation(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized || normalized.length > 80) {
+    return false;
+  }
+
+  return (
+    SHORT_DEV_AFFIRMATION_PATTERN.test(normalized) ||
+    /^(yes|yep|sure|ok|okay|do it|sounds good|go for it)[\s.!]*$/i.test(normalized)
+  );
+}
+
+export function threadLooksLikeDevProposal(threadHighlights: string): boolean {
+  if (threadHighlights === "No prior conversation in this thread.") {
+    return false;
+  }
+
+  return DEV_PROPOSAL_CONTEXT_PATTERN.test(threadHighlights);
+}
+
+export function isDevFollowUp(text: string, threadHighlights: string): boolean {
+  return isShortDevAffirmation(text) && threadLooksLikeDevProposal(threadHighlights);
 }
 
 export function isVagueDevConfirmation(task: string): boolean {

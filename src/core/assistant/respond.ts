@@ -2,7 +2,7 @@ import type { ChatMessage } from "../llm.js";
 import { isLlmConfigured, runAssistantTurn } from "../llm.js";
 import type { InteractiveSkillContext } from "../../types.js";
 import { assistantTools, executeAssistantTool } from "./tools.js";
-import { appendConversationTurn, getConversationMessages } from "../memory/conversation.js";
+import { appendConversationTurn, formatConversationHighlights, getConversationMessages } from "../memory/conversation.js";
 import { summarizeRecentActivity } from "../activity-log.js";
 import {
   addConversationToMem0,
@@ -21,9 +21,13 @@ export interface AssistantReplyOptions {
 }
 
 const RECALL_PATTERN =
-  /\b(remember|recall|what did (we|you|i)|what have you been|yesterday|last night|earlier today|what tasks?|what were you doing|personality|inner life|who are you|world domination|do you do things|do you have a life)\b/i;
+  /\b(remember|recall|what did (we|you|i)|what have you been|yesterday|last night|earlier today|what tasks?|what were you doing|personality|inner life|who are you|world domination|do you do things|do you have a life|what did we talk|what were we (talking|chatting)|our (last |recent )?conversation)\b/i;
 
-const LIFE_RECALL_TOOL_NAMES = new Set(["get_sag_recent_activity", "get_agent_memories"]);
+const LIFE_RECALL_TOOL_NAMES = new Set([
+  "get_sag_recent_activity",
+  "get_agent_memories",
+  "get_conversation_highlights",
+]);
 
 export function isRecallQuestion(text: string): boolean {
   return RECALL_PATTERN.test(text);
@@ -45,7 +49,7 @@ async function buildLifeContextBlock(
   context: InteractiveSkillContext,
 ): Promise<string> {
   const toolOptions = { memoryUserId };
-  const [activity, agentMemories, activitySummary, agentSearch, userSearch] = await Promise.all([
+  const [activity, agentMemories, activitySummary, agentSearch, userSearch, chatHighlights] = await Promise.all([
     executeAssistantTool("get_sag_recent_activity", JSON.stringify({ since_hours: 12 }), context, toolOptions),
     executeAssistantTool(
       "get_agent_memories",
@@ -56,6 +60,7 @@ async function buildLifeContextBlock(
     summarizeRecentActivity({ sinceHours: 12, limit: 20 }),
     searchAgentMemories(userText, 6),
     searchUserMemories(memoryUserId, userText, 4),
+    formatConversationHighlights(memoryUserId, 8),
   ]);
 
   return [
@@ -70,6 +75,9 @@ async function buildLifeContextBlock(
     agentSearch || agentMemories,
     "",
     userSearch,
+    "",
+    "Recent conversation:",
+    chatHighlights,
   ]
     .filter(Boolean)
     .join("\n");

@@ -368,7 +368,10 @@ const GENERIC_AGENT_MEMORY_PATTERNS = [
   /^user asked/i,
   /^user is testing/i,
   /conservice bill/i,
-  /^assistant (offers|provides|operates|says)/i,
+  /as an ai/i,
+  /language model/i,
+  /virtual assistant/i,
+  /i don't have feelings/i,
 ];
 
 export function isGenericAgentMemory(text: string): boolean {

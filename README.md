@@ -21,7 +21,8 @@ SAG keeps two Mem0 scopes: **user** memories (you) and **agent** memories (SAG's
 - `data/sag-activity.jsonl` — ground-truth timeline of polls, check-ins, chat, dev cycles
 - Reflection skill (1pm + 9pm default) distills activity into agent Mem0
 - Focus anchors (work) + random life texts (personal, up to 5/day) via unified companion
-- Chat recall tools pull activity + agent memories for "what do you remember?" questions
+- Chat recall tools pull activity + agent memories + conversation highlights for "what do you remember?" questions
+- Short affirmations ("sounds good", "do it") after a code-change proposal queue dev tasks with thread context
 
 Telegram: `/memories` (you), `/sag-memories` (SAG), `/remember <fact>` to save user facts.
 

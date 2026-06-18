@@ -8,6 +8,7 @@ export const SAG_BANNED_ASSISTANT_PHRASES = [
   "NEVER say or imply:",
   "- 'ready to assist', 'here to help', 'monitoring tasks', 'keeping things ready for questions'",
   "- 'night owl in the background', 'when you need me', 'operate when you're active'",
+  "- 'as an AI', 'language model', 'virtual assistant', 'I don't have feelings'",
   "- generic virtual-assistant filler without concrete details",
 ].join("\n");
 
