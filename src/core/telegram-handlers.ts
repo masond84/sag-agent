@@ -5,6 +5,7 @@ import {
   shouldUseCheckInNudge,
   isGeneralConversation,
   isDevTaskRequest,
+  isDevFollowUp,
   extractDevTask,
   isVagueDevConfirmation,
 } from "./message-routing.js";
@@ -14,7 +15,11 @@ import { isDevRunnerEnabled, queueManualDevTask } from "./dev/state.js";
 import { isCursorOrchestratorMode } from "./orchestrator/config.js";
 import { runDevCycle } from "./dev/runner.js";
 import { formatSkillCatalog } from "./skill-catalog.js";
-import { clearConversation, formatConversationHighlights } from "./memory/conversation.js";
+import {
+  clearConversation,
+  extractLastAssistantProposal,
+  formatConversationHighlights,
+} from "./memory/conversation.js";
 import {
   addExplicitMemory,
   listAgentMemories,
@@ -39,12 +44,21 @@ function formatSkillsList(context: InteractiveSkillContext): string {
 }
 
 async function resolveManualDevTask(text: string, memoryUserId: string): Promise<{ task: string; taskContext?: string }> {
+  const highlights = await formatConversationHighlights(memoryUserId, 8);
+
+  if (isDevFollowUp(text, highlights)) {
+    const lastProposal = await extractLastAssistantProposal(memoryUserId);
+    const task = lastProposal
+      ? `Implement the change SAG proposed: ${lastProposal.slice(0, 240)}`
+      : "Implement the change discussed in recent conversation.";
+    return { task, taskContext: highlights };
+  }
+
   const task = extractDevTask(text);
   if (!isVagueDevConfirmation(task)) {
     return { task };
   }
 
-  const highlights = await formatConversationHighlights(memoryUserId, 8);
   if (highlights === "No prior conversation in this thread.") {
     return { task };
   }
@@ -204,7 +218,9 @@ export async function buildTelegramReply(
     return await handleCommand(command, context, memoryUserId);
   }
 
-  if (isDevRunnerEnabled() && isDevTaskRequest(text)) {
+  const threadHighlights = await formatConversationHighlights(memoryUserId, 8);
+
+  if (isDevRunnerEnabled() && (isDevTaskRequest(text) || isDevFollowUp(text, threadHighlights))) {
     const resolved = await resolveManualDevTask(text, memoryUserId);
     await queueManualDevTask(resolved.task, resolved.taskContext);
     const modeHint = isCursorOrchestratorMode()

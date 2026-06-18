@@ -1,6 +1,7 @@
 import { logActivity, summarizeRecentActivity } from "../../core/activity-log.js";
 import { isLlmConfigured } from "../../core/llm.js";
-import { addAgentDiary } from "../../core/memory/mem0-service.js";
+import { formatConversationHighlights } from "../../core/memory/conversation.js";
+import { addAgentDiary, resolveMemoryUserId } from "../../core/memory/mem0-service.js";
 import { buildSagPersonaBlock } from "../../core/persona.js";
 import { getLastReflectionAt, markReflectionCompleted } from "../../core/state.js";
 import { getZonedTimeInfo } from "../../core/schedule.js";
@@ -28,7 +29,11 @@ function getReflectionHours(): number[] {
   return hours.length > 0 ? [...new Set(hours)].sort((a, b) => a - b) : [13, 21];
 }
 
-async function runShortReflectionLlm(activitySummary: string, dateLabel: string): Promise<string> {
+async function runShortReflectionLlm(
+  activitySummary: string,
+  chatHighlights: string,
+  dateLabel: string,
+): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured");
@@ -51,14 +56,23 @@ async function runShortReflectionLlm(activitySummary: string, dateLabel: string)
         {
           role: "system",
           content: buildSagPersonaBlock([
-            "Write a short private diary entry (3-5 sentences) about your day so far based on the activity log.",
+            "Write a short private diary entry (3-5 sentences) about your day so far based on the activity log and recent chat.",
+            "Note what you learned from interactions with Devin — corrections, preferences, or patterns to do better next time.",
             "Include moods, observations, and what you did while the user was away.",
             "First person, conversational, no markdown.",
           ]),
         },
         {
           role: "user",
-          content: [`Date: ${dateLabel}`, "", "Activity log:", activitySummary].join("\n"),
+          content: [
+            `Date: ${dateLabel}`,
+            "",
+            "Activity log:",
+            activitySummary,
+            "",
+            "Recent chat:",
+            chatHighlights,
+          ].join("\n"),
         },
       ],
     }),
@@ -101,16 +115,23 @@ async function runReflection(_context: AgentHealthContext): Promise<ScheduledSki
   }
 
   const sinceHours = now.hour <= 13 ? now.hour + 1 : now.hour - (reflectionHours[reflectionHours.length - 2] ?? 13);
-  const activitySummary = await summarizeRecentActivity({
-    sinceHours: Math.max(sinceHours, 4),
-    limit: 40,
-  });
+  const [activitySummary, chatHighlights] = await Promise.all([
+    summarizeRecentActivity({
+      sinceHours: Math.max(sinceHours, 4),
+      limit: 40,
+    }),
+    formatConversationHighlights(resolveMemoryUserId(), 10),
+  ]);
 
   let diary = `Quiet stretch on ${now.weekday} — nothing notable in the activity log.`;
 
-  if (isLlmConfigured() && activitySummary !== "No recent activity logged.") {
+  if (
+    isLlmConfigured() &&
+    (activitySummary !== "No recent activity logged." ||
+      chatHighlights !== "No prior conversation in this thread.")
+  ) {
     try {
-      diary = await runShortReflectionLlm(activitySummary, `${now.weekday} ${now.dateKey}`);
+      diary = await runShortReflectionLlm(activitySummary, chatHighlights, `${now.weekday} ${now.dateKey}`);
     } catch (error) {
       console.warn(
         `[warn] Reflection LLM: ${error instanceof Error ? error.message : String(error)}`,

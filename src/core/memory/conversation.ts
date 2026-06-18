@@ -60,6 +60,24 @@ export async function clearConversation(userId: string): Promise<void> {
   await writeThread({ userId, updatedAt: new Date().toISOString(), messages: [] });
 }
 
+export async function extractLastAssistantProposal(userId: string): Promise<string | null> {
+  const thread = await readThread(userId);
+  for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
+    const message = thread.messages[index];
+    if (message?.role !== "assistant") {
+      continue;
+    }
+
+    const content =
+      typeof message.content === "string" ? message.content.trim() : JSON.stringify(message.content);
+    if (content) {
+      return content;
+    }
+  }
+
+  return null;
+}
+
 export async function formatConversationHighlights(userId: string, maxTurns = 6): Promise<string> {
   const thread = await readThread(userId);
   const conversational = thread.messages.filter(
