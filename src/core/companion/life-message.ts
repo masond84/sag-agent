@@ -1,5 +1,4 @@
 import { summarizeRecentActivity } from "../activity-log.js";
-import { buildCompanionMessage } from "../companion-message.js";
 import { isLlmConfigured } from "../llm.js";
 import { searchAgentMemories } from "../memory/mem0-service.js";
 import { getZonedTimeInfo } from "../schedule.js";
@@ -90,5 +89,3 @@ export async function buildLifeCompanionMessage(timeZone?: string): Promise<stri
     return template;
   }
 }
-
-export { buildCompanionMessage };
