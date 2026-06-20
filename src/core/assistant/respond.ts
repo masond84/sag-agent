@@ -111,7 +111,7 @@ async function buildSystemPrompt(
       : "",
     lifeMode ? "Mode: casual life conversation — work/focus only if Devin brought it up." : "",
     "",
-    "Slash commands: /help, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear",
+    "Slash commands: /help, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
   ].filter(Boolean);
 
   if (options.pendingCheckInSlot) {
