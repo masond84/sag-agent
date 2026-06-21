@@ -1,6 +1,6 @@
 import { Bot } from "grammy";
 import type { InteractiveSkillContext } from "../types.js";
-import { buildTelegramReply } from "./telegram-handlers.js";
+import { buildTelegramReply, TELEGRAM_COMMANDS } from "./telegram-handlers.js";
 import { isTelegramConfigured } from "./notify.js";
 import { isAuthorizedChat, splitTelegramMessage } from "./telegram.js";
 
@@ -34,6 +34,7 @@ export async function startTelegramBot(getContext: TelegramContextProvider): Pro
     }
 
     try {
+      await ctx.replyWithChatAction("typing");
       const context = await getContext();
       const reply = await buildTelegramReply(text, context, chatId);
       for (const chunk of splitTelegramMessage(reply)) {
@@ -47,6 +48,14 @@ export async function startTelegramBot(getContext: TelegramContextProvider): Pro
   });
 
   await bot.api.deleteWebhook({ drop_pending_updates: false });
+  try {
+    await bot.api.setMyCommands(TELEGRAM_COMMANDS);
+  } catch (error) {
+    console.warn(
+      "[warn] Telegram command menu unavailable:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 
   void bot.start({
     onStart: () => {

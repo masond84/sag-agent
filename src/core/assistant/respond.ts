@@ -104,6 +104,9 @@ async function buildSystemPrompt(
     "",
     "Use tools when you need facts you do not already have in context below.",
     "- Bills, focus, skills, status → use the matching tool",
+    "- If Devin asks to set today's focus, use set_today_focus and confirm it plainly",
+    "- If Devin asks you to remember a durable fact, use remember_user_fact and confirm it plainly",
+    "- If Devin asks what happened today or wants a daily summary, use get_today_digest",
     "- What you did / who you are → get_sag_recent_activity + get_agent_memories",
     "",
     lifeContextMode
@@ -111,7 +114,7 @@ async function buildSystemPrompt(
       : "",
     lifeMode ? "Mode: casual life conversation — work/focus only if Devin brought it up." : "",
     "",
-    "Slash commands: /help, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
+    "Slash commands: /help, /today, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
   ].filter(Boolean);
 
   if (options.pendingCheckInSlot) {
