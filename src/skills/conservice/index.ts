@@ -32,6 +32,7 @@ export const conserviceSkill: EmailSkill = {
     return extractConserviceStatement(message);
   },
   format(data) {
-    return formatConserviceStatement(data, "Conservice bill ready");
+    const prefix = this.config.notify?.prefix ?? "Conservice bill ready";
+    return formatConserviceStatement(data, prefix);
   },
 };
