@@ -57,6 +57,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot + authorized chat |
 | `OPENAI_API_KEY` | Assistant + companion LLM replies |
 | `POLL_INTERVAL_MS` | Gmail poll interval (not chat) |
+| `PROCESSED_MESSAGE_ID_LIMIT` | Gmail dedupe ID retention cap (default 1000) |
 | `SCHEDULE_CRON` | Cron pattern for scheduled skills (default every minute) |
 | `DRY_RUN` | `true` = log email notifications without sending |
 | `DEV_RUNNER_ENABLED` | `true` = autonomous code/PR loop (requires `gh auth`) |
@@ -77,6 +78,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:activity` | Smoke-test activity log |
 | `npm run test:reflection` | List agent Mem0; optional `--seed=` |
 | `npm run test:memory` | User Mem0 smoke test |
+| `npm run test:state` | Smoke-test local state retention |
 | `npm run test:dev` | Dev runner status |
 | `npm run launchd:install` | Mac background auto-start |
 
