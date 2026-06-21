@@ -79,9 +79,29 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:memory` | User Mem0 smoke test |
 | `npm run test:dev` | Dev runner status |
 | `npm run launchd:install` | Mac background auto-start |
+| `npm run house:dev` | SAG House web UI (requires worker house server) |
+| `npm run house:build` | Production build for house/ |
 
 ## Deployment
 
 Primary: **launchd** on Mac (`npm run launchd:install`). Optional: Docker (`docker-compose up`).
 
 Never commit `.env` or `data/`.
+
+## SAG House (web UI)
+
+Optional Next.js app in `house/` — skill constellation map, live activity feed, and Tier 1 presence shell (animated face + TTS).
+
+```bash
+# In .env
+HOUSE_SERVER_ENABLED=true
+
+# Terminal 1 — worker
+npm run dev
+
+# Terminal 2 — house UI
+npm run house:install
+npm run house:dev
+```
+
+Open http://localhost:3000. See `house/README.md` for API routes and Vercel deploy notes.

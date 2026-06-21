@@ -1,5 +1,6 @@
 import { Bot } from "grammy";
 import type { InteractiveSkillContext } from "../types.js";
+import { publishHouseSpeech } from "./house/events.js";
 import { buildTelegramReply } from "./telegram-handlers.js";
 import { isTelegramConfigured } from "./notify.js";
 import { isAuthorizedChat, splitTelegramMessage } from "./telegram.js";
@@ -36,6 +37,7 @@ export async function startTelegramBot(getContext: TelegramContextProvider): Pro
     try {
       const context = await getContext();
       const reply = await buildTelegramReply(text, context, chatId);
+      publishHouseSpeech(reply, { source: "telegram" });
       for (const chunk of splitTelegramMessage(reply)) {
         await ctx.reply(chunk);
       }

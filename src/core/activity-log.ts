@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { isHouseServerEnabled, publishHouseEvent } from "./house/events.js";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const ACTIVITY_FILE = path.join(DATA_DIR, "sag-activity.jsonl");
@@ -54,6 +55,12 @@ export async function logActivity(
   try {
     await mkdir(DATA_DIR, { recursive: true });
     await appendFile(ACTIVITY_FILE, line, "utf8");
+    if (isHouseServerEnabled()) {
+      publishHouseEvent("activity", {
+        text: event.summary,
+        meta: { type: event.type, ...(event.meta ?? {}) },
+      });
+    }
   } catch (error) {
     if ((process.env.LOG_LEVEL ?? "info") !== "error") {
       console.warn(

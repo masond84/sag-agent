@@ -28,7 +28,10 @@
     "launchd:install": "bash scripts/launchd-install.sh",
     "launchd:uninstall": "bash scripts/launchd-uninstall.sh",
     "launchd:status": "bash scripts/launchd-status.sh",
-    "launchd:relocate": "bash scripts/launchd-relocate.sh"
+    "launchd:relocate": "bash scripts/launchd-relocate.sh",
+    "house:install": "npm install --prefix house",
+    "house:dev": "npm run dev --prefix house",
+    "house:build": "npm run build --prefix house"
   },
   "engines": {
     "node": ">=20"
