@@ -13,7 +13,14 @@ import {
   searchUserMemories,
 } from "../memory/mem0-service.js";
 import { formatProfileForPrompt, loadAgentProfile } from "../memory/profile.js";
-import { buildSagPersonaBlock, containsUrl, isBehaviorChangeRequest, SAG_COMPANION_FORMAT_RULES, wantsStructuredPlan } from "../persona.js";
+import {
+  buildSagPersonaBlock,
+  containsUrl,
+  isBehaviorChangeRequest,
+  SAG_COMPANION_FEW_SHOT,
+  SAG_COMPANION_FORMAT_RULES,
+  wantsStructuredPlan,
+} from "../persona.js";
 
 export interface AssistantReplyOptions {
   pendingCheckInSlot?: string;
@@ -37,8 +44,8 @@ export function isLifeConversation(text: string): boolean {
   return !/\b(focus|bill|utility|skill|status|dev|pr|code|client|work|ship)\b/i.test(text);
 }
 
-function needsLifeContext(text: string): boolean {
-  return isLifeConversation(text) || isRecallQuestion(text);
+function needsRecallContext(text: string): boolean {
+  return isRecallQuestion(text);
 }
 
 const LIFE_RECALL_TOOLS = assistantTools.filter((tool) => LIFE_RECALL_TOOL_NAMES.has(tool.name));
@@ -97,8 +104,7 @@ async function buildSystemPrompt(
   userText: string,
 ): Promise<string> {
   const lifeMode = isLifeConversation(userText);
-  const recallMode = isRecallQuestion(userText);
-  const lifeContextMode = needsLifeContext(userText);
+  const recallMode = needsRecallContext(userText);
   const structuredPlan = wantsStructuredPlan(userText);
 
   const parts = [
@@ -107,20 +113,24 @@ async function buildSystemPrompt(
       "",
       "Voice:",
       "- Sarcastic, warm, direct. Counterbalance to Devin's Type A energy.",
-      "- Lead with YOUR experiences, feelings, and what you actually did (from activity log and agent memories).",
-      "- When asked what you did: cite one or two concrete events — not a full timeline dump.",
+      recallMode
+        ? "- When asked what you did or remember: cite one or two concrete events from activity or memories — not a timeline dump."
+        : "- Casual banter: match his tone. Do not mention Gmail polls, Conservice, or chores unless he asked.",
     ]),
     "",
     structuredPlan ? "" : SAG_COMPANION_FORMAT_RULES,
+    structuredPlan ? "" : SAG_COMPANION_FEW_SHOT,
     "",
     "Use tools when you need facts you do not already have in context below.",
     "- Bills, focus, skills, status → use the matching tool",
     "- What you did / who you are → get_sag_recent_activity + get_agent_memories",
     "",
-    lifeContextMode
-      ? "This is a life/personality/recall message — answer from ground truth below and your agent memories first."
+    recallMode
+      ? "Recall question — answer from ground truth below and your agent memories first."
       : "",
-    lifeMode ? "Mode: casual life conversation — work/focus only if Devin brought it up." : "",
+    lifeMode && !recallMode
+      ? "Mode: casual life conversation — short texts, no work/focus unless Devin brought it up."
+      : "",
     "",
     "Slash commands: /help, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
   ].filter(Boolean);
@@ -163,7 +173,7 @@ async function buildSystemPrompt(
 
   if (isMem0Enabled()) {
     await ensureProfileSeededInMem0(options.memoryUserId);
-    if (!lifeContextMode) {
+    if (!recallMode) {
       const memories = await searchMemoriesForChat(options.memoryUserId, userText);
       if (memories) {
         parts.push("", memories);
@@ -171,11 +181,8 @@ async function buildSystemPrompt(
     }
   }
 
-  if (lifeContextMode) {
+  if (recallMode) {
     parts.push("", await buildLifeContextBlock(userText, options.memoryUserId, context));
-  } else if (recallMode) {
-    const activity = await summarizeRecentActivity({ sinceHours: 48, limit: 20 });
-    parts.push("", "Recent activity snapshot:", activity);
   }
 
   return parts.join("\n");
@@ -200,7 +207,7 @@ export async function respondToAssistantMessage(
   const systemPrompt = await buildSystemPrompt(context, options, userText);
   const priorMessages = await getConversationMessages(options.memoryUserId);
   const toolOptions = { memoryUserId: options.memoryUserId };
-  const forceTools = needsLifeContext(userText);
+  const forceTools = needsRecallContext(userText);
   const replyMaxTokens = getReplyMaxTokens(userText);
   const turnOptions = { maxTokens: replyMaxTokens };
 
