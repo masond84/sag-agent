@@ -13,7 +13,7 @@ import {
   searchUserMemories,
 } from "../memory/mem0-service.js";
 import { formatProfileForPrompt, loadAgentProfile } from "../memory/profile.js";
-import { buildSagPersonaBlock } from "../persona.js";
+import { buildSagPersonaBlock, containsUrl, isBehaviorChangeRequest, SAG_COMPANION_FORMAT_RULES, wantsStructuredPlan } from "../persona.js";
 
 export interface AssistantReplyOptions {
   pendingCheckInSlot?: string;
@@ -83,6 +83,14 @@ async function buildLifeContextBlock(
     .join("\n");
 }
 
+function getReplyMaxTokens(userText: string): number {
+  const base = Number(process.env.ASSISTANT_MAX_TOKENS ?? 120);
+  if (wantsStructuredPlan(userText)) {
+    return Math.max(base, Number(process.env.ASSISTANT_PLAN_MAX_TOKENS ?? 280));
+  }
+  return base;
+}
+
 async function buildSystemPrompt(
   context: InteractiveSkillContext,
   options: AssistantReplyOptions,
@@ -91,6 +99,7 @@ async function buildSystemPrompt(
   const lifeMode = isLifeConversation(userText);
   const recallMode = isRecallQuestion(userText);
   const lifeContextMode = needsLifeContext(userText);
+  const structuredPlan = wantsStructuredPlan(userText);
 
   const parts = [
     buildSagPersonaBlock([
@@ -99,8 +108,10 @@ async function buildSystemPrompt(
       "Voice:",
       "- Sarcastic, warm, direct. Counterbalance to Devin's Type A energy.",
       "- Lead with YOUR experiences, feelings, and what you actually did (from activity log and agent memories).",
-      "- When asked what you did: cite specific timestamps and events from the activity log.",
+      "- When asked what you did: cite one or two concrete events — not a full timeline dump.",
     ]),
+    "",
+    structuredPlan ? "" : SAG_COMPANION_FORMAT_RULES,
     "",
     "Use tools when you need facts you do not already have in context below.",
     "- Bills, focus, skills, status → use the matching tool",
@@ -113,6 +124,22 @@ async function buildSystemPrompt(
     "",
     "Slash commands: /help, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
   ].filter(Boolean);
+
+  if (containsUrl(userText)) {
+    parts.push(
+      "",
+      "Devin shared a URL. You cannot open, watch, or browse links (TikTok, YouTube, etc.).",
+      "Say that plainly in one sentence, ask what caught their eye — do not pretend you viewed it.",
+    );
+  }
+
+  if (isBehaviorChangeRequest(userText)) {
+    parts.push(
+      "",
+      "Devin wants you to change how you talk. Commit to it briefly (e.g. 'Got it — shorter from here').",
+      "Do NOT tell Devin how to prompt you better.",
+    );
+  }
 
   if (options.pendingCheckInSlot) {
     parts.push(
@@ -174,6 +201,8 @@ export async function respondToAssistantMessage(
   const priorMessages = await getConversationMessages(options.memoryUserId);
   const toolOptions = { memoryUserId: options.memoryUserId };
   const forceTools = needsLifeContext(userText);
+  const replyMaxTokens = getReplyMaxTokens(userText);
+  const turnOptions = { maxTokens: replyMaxTokens };
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -187,7 +216,10 @@ export async function respondToAssistantMessage(
     const turn = await runAssistantTurn(
       messages,
       forceTools && step === 0 ? LIFE_RECALL_TOOLS : assistantTools,
-      forceTools && step === 0 ? { toolChoice: "required" } : { toolChoice: "auto" },
+      {
+        ...turnOptions,
+        toolChoice: forceTools && step === 0 ? "required" : "auto",
+      },
     );
 
     if (turn.toolCalls.length === 0) {
@@ -214,7 +246,10 @@ export async function respondToAssistantMessage(
   }
 
   if (!reply) {
-    const finalTurn = await runAssistantTurn(messages, assistantTools, { toolChoice: "none" });
+    const finalTurn = await runAssistantTurn(messages, assistantTools, {
+      ...turnOptions,
+      toolChoice: "none",
+    });
     reply = (finalTurn.message.content ?? "").trim() || "I couldn't finish that request.";
   }
 

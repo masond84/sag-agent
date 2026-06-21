@@ -29,7 +29,15 @@ function getBaseUrl(): string {
 }
 
 function getMaxTokens(): number {
-  return Number(process.env.ASSISTANT_MAX_TOKENS ?? 400);
+  return Number(process.env.ASSISTANT_MAX_TOKENS ?? 120);
+}
+
+function getAssistantTemperature(): number {
+  const raw = Number(process.env.ASSISTANT_TEMPERATURE ?? 0.85);
+  if (!Number.isFinite(raw)) {
+    return 0.85;
+  }
+  return Math.min(Math.max(raw, 0), 2);
 }
 
 function getDevMaxTokens(): number {
@@ -43,7 +51,12 @@ function getDevModel(): string {
 async function runChatCompletion(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  options?: { maxTokens?: number; model?: string; toolChoice?: "auto" | "required" | "none" },
+  options?: {
+    maxTokens?: number;
+    model?: string;
+    toolChoice?: "auto" | "required" | "none";
+    temperature?: number;
+  },
 ): Promise<{ message: ChatMessage; toolCalls: Array<{ id: string; name: string; arguments: string }> }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
@@ -51,6 +64,7 @@ async function runChatCompletion(
   const body: Record<string, unknown> = {
     model: options?.model ?? getModel(),
     max_tokens: options?.maxTokens ?? getMaxTokens(),
+    temperature: options?.temperature ?? getAssistantTemperature(),
     messages,
   };
 
@@ -90,9 +104,13 @@ async function runChatCompletion(
 export async function runAssistantTurn(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  options?: { toolChoice?: "auto" | "required" | "none" },
+  options?: { toolChoice?: "auto" | "required" | "none"; maxTokens?: number; temperature?: number },
 ) {
-  return runChatCompletion(messages, tools, { toolChoice: options?.toolChoice });
+  return runChatCompletion(messages, tools, {
+    toolChoice: options?.toolChoice,
+    maxTokens: options?.maxTokens,
+    temperature: options?.temperature,
+  });
 }
 
 export async function runDevTurn(messages: ChatMessage[], tools: ToolDefinition[]) {
