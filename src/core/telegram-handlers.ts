@@ -1,5 +1,6 @@
 import { logActivity } from "./activity-log.js";
 import { buildCheckInReplyNudge } from "./companion-message.js";
+import { formatDailyDigest } from "./daily-digest.js";
 import { formatHealthAudit } from "./health-audit.js";
 import {
   shouldUseCheckInNudge,
@@ -43,6 +44,43 @@ function formatSkillsList(context: InteractiveSkillContext): string {
   return formatSkillCatalog(context.skills);
 }
 
+export const TELEGRAM_COMMANDS = [
+  { command: "start", description: "Onboard and see what SAG does" },
+  { command: "help", description: "Show commands and natural-language examples" },
+  { command: "today", description: "Summarize focus, activity, bills, and status" },
+  { command: "status", description: "Show full worker health audit" },
+  { command: "skills", description: "List active SAG skills" },
+  { command: "focus", description: "Show or set today's focus" },
+  { command: "remember", description: "Save a durable user memory" },
+  { command: "memories", description: "List stored user memories" },
+  { command: "sag_memories", description: "List SAG's own memories" },
+  { command: "dev", description: "Show or queue dev-runner work" },
+  { command: "ping", description: "Check whether SAG is online" },
+];
+
+export function formatStart(context: InteractiveSkillContext): string {
+  const skillNames = context.skills.map((skill) => skill.name).join(", ") || "no skills loaded";
+  return [
+    "SAG is online.",
+    "",
+    "What I can do from this chat:",
+    "- Answer questions with memory and recent activity context when the LLM is configured.",
+    "- Track today's focus and respond to check-ins.",
+    "- Watch Gmail for Conservice bills and summarize charges.",
+    "- Keep a lightweight activity timeline and agent diary.",
+    "- Queue code work through the dev runner when that mode is enabled.",
+    "",
+    "Try:",
+    "- /today",
+    "- Set my focus to ship the dashboard PR",
+    "- Remember that I prefer concise morning updates",
+    "- What have you been doing today?",
+    "",
+    `Loaded skills: ${skillNames}`,
+    "Use /help for the full command list.",
+  ].join("\n");
+}
+
 async function resolveManualDevTask(text: string, memoryUserId: string): Promise<{ task: string; taskContext?: string }> {
   const highlights = await formatConversationHighlights(memoryUserId, 8);
 
@@ -75,12 +113,15 @@ export function formatHelp(): string {
     "- What do you remember from yesterday?",
     "- What have you been doing today?",
     "- What was my last utility bill?",
+    "- Set my focus to Ship the PR",
+    "- Remember that I prefer brief status updates",
     "- I'm bored, want to chat",
     "",
-    "Companion: focus check-ins (work) + random life texts (personal). Co-create SAG's personality over time.",
-    "Set focus: /focus followed by your goal (e.g. /focus Ship the PR)",
+    "Companion: focus check-ins, random life texts, memory, bills, and dev handoff when configured.",
+    "Natural language can set focus or save memories when the assistant LLM is enabled.",
     "",
     "Commands:",
+    "/today — summarize focus, activity, latest bill, and runtime mode",
     "/ping — check if SAG is online",
     "/status — full health audit",
     "/skills — list active skills",
@@ -114,8 +155,12 @@ async function handleRememberCommand(text: string, memoryUserId: string): Promis
     return 'Usage: /remember followed by a fact (e.g. /remember I prefer React over Vue)';
   }
 
-  await addExplicitMemory(memoryUserId, fact);
-  return `Got it — I'll remember: "${fact}"`;
+  try {
+    await addExplicitMemory(memoryUserId, fact);
+    return `Got it — I'll remember: "${fact}"`;
+  } catch (error) {
+    return `Could not save that memory: ${error instanceof Error ? error.message : String(error)}`;
+  }
 }
 
 async function handleDevCommand(text: string): Promise<string> {
@@ -171,6 +216,8 @@ async function handleCommand(
       return isCursorOrchestratorMode() ? "SAG online (orchestrator mode)" : "SAG online";
     case "/status":
       return ["SAG status", "", formatHealthAudit(context.health)].join("\n");
+    case "/today":
+      return formatDailyDigest(context);
     case "/skills":
       return formatSkillsList(context);
     case "/profile":
@@ -178,13 +225,15 @@ async function handleCommand(
     case "/memories":
       return listUserMemories(memoryUserId);
     case "/sag-memories":
+    case "/sag_memories":
       return listAgentMemories();
     case "/clear":
       await clearConversation(memoryUserId);
       return "Cleared this chat's short-term conversation thread.";
     case "/help":
-    case "/start":
       return formatHelp();
+    case "/start":
+      return formatStart(context);
     default:
       return [`Unknown command: ${command}`, "", formatHelp()].join("\n");
   }

@@ -26,6 +26,18 @@ SAG keeps two Mem0 scopes: **user** memories (you) and **agent** memories (SAG's
 
 Telegram: `/memories` (you), `/sag-memories` (SAG), `/remember <fact>` to save user facts.
 
+## Telegram chat surface
+
+SAG registers a Telegram command menu on startup. Use `/start` for onboarding, `/help`
+for examples, and `/today` for a deterministic digest of focus, recent activity,
+latest bill, loaded skills, and runtime mode. With the assistant LLM configured,
+natural language can also set focus or save durable memories, for example:
+
+```text
+Set my focus to ship the dashboard PR
+Remember that I prefer concise morning updates
+```
+
 ## Orchestrator
 
 Autonomous code changes follow one pipeline:
@@ -81,6 +93,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:state` | Smoke-test processed-message state retention cap |
 | `npm run test:reflection` | List agent Mem0; optional `--seed=` |
 | `npm run test:memory` | User Mem0 smoke test |
+| `npm run test:telegram-ux` | Smoke-test Telegram onboarding/help/digest wiring |
 | `npm run test:dev` | Dev runner status |
 | `npm run launchd:install` | Mac background auto-start |
 | `npm run sag:refresh` | Pull main, rebuild worker + House, restart both |

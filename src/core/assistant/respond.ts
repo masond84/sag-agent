@@ -126,6 +126,9 @@ async function buildSystemPrompt(
     "- Email search/read in Gmail → gmail__search_emails, gmail__read_email (Gmail query syntax in query)",
     "- Calendar schedule → calendar__list-events, calendar__search-events, calendar__get-freebusy, calendar__get-current-time",
     "- Stored Conservice bills already processed → get_latest_utility_bill",
+    "- If Devin asks to set today's focus, use set_today_focus and confirm it plainly",
+    "- If Devin asks you to remember a durable fact, use remember_user_fact and confirm it plainly",
+    "- If Devin asks what happened today or wants a daily summary, use get_today_digest",
     "- What you did / who you are → get_sag_recent_activity + get_agent_memories",
     "",
     recallMode
@@ -135,7 +138,7 @@ async function buildSystemPrompt(
       ? "Mode: casual life conversation — short texts, no work/focus unless Devin brought it up."
       : "",
     "",
-    "Slash commands: /help, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
+    "Slash commands: /help, /today, /skills, /status, /focus, /ping, /profile, /remember, /memories, /sag-memories, /clear, /dev",
   ].filter(Boolean);
 
   if (containsUrl(userText)) {
