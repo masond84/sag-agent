@@ -1,6 +1,6 @@
 export type OrchestratorMode = "local" | "cursor";
 
-const GUARDRAIL_ALLOW = ["src/", "config/", "scripts/", "README.md", ".env.example"];
+const GUARDRAIL_ALLOW = ["src/", "config/", "scripts/", "house/", "README.md", ".env.example"];
 const GUARDRAIL_BLOCK = [".env", "data/", "node_modules/"];
 
 export function getOrchestratorMode(): OrchestratorMode {

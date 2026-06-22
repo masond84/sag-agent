@@ -11,6 +11,7 @@ import {
   hasProcessed,
   markProcessed,
 } from "./state.js";
+import { startHouseServer } from "./house/server.js";
 import { startTelegramBot } from "./telegram-bot.js";
 
 function log(level: WorkerConfig["logLevel"], message: string): void {
@@ -116,6 +117,10 @@ export async function runWorker(skills: LoadedSkills, config: WorkerConfig, once
     health: await getHealthContext(),
     skills: summarizeSkills(skills),
   });
+
+  if (!once) {
+    startHouseServer(getHealthContext);
+  }
 
   if (!once && isTelegramConfigured() && skills.interactive.length > 0) {
     await startTelegramBot(getInteractiveContext);
