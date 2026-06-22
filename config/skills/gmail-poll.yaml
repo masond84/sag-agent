@@ -1,0 +1,4 @@
+id: gmail-poll
+name: Gmail Poll
+enabled: true
+kind: scheduled

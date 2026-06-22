@@ -23,7 +23,16 @@ function log(level: WorkerConfig["logLevel"], message: string): void {
   }
 }
 
+function isGmailPollEnabled(skills: LoadedSkills): boolean {
+  return skills.scheduled.some((skill) => skill.config.id === "gmail-poll");
+}
+
 async function processEmailSkills(skills: LoadedSkills, config: WorkerConfig): Promise<void> {
+  if (!isGmailPollEnabled(skills)) {
+    log("debug", "Gmail poll skill disabled — email skills skipped");
+    return;
+  }
+
   if (!isGmailConfigured()) {
     log(
       "warn",
@@ -146,7 +155,12 @@ export async function runWorker(skills: LoadedSkills, config: WorkerConfig, once
   };
 
   await runScheduleOnce();
-  await runEmailCycle();
+
+  if (isGmailPollEnabled(skills)) {
+    await runEmailCycle();
+  } else {
+    log("info", "Gmail poll skill disabled — email polling not started");
+  }
 
   if (once) {
     return;
@@ -154,7 +168,9 @@ export async function runWorker(skills: LoadedSkills, config: WorkerConfig, once
 
   startScheduledCron(skills, getHealthContext, config);
   log("info", `Scheduled skills cron started (pattern=${process.env.SCHEDULE_CRON?.trim() || "* * * * *"})`);
-  log("info", `Email poll interval: ${config.pollIntervalMs}ms`);
 
-  setInterval(runEmailCycle, config.pollIntervalMs);
+  if (isGmailPollEnabled(skills)) {
+    log("info", `Email poll interval: ${config.pollIntervalMs}ms`);
+    setInterval(runEmailCycle, config.pollIntervalMs);
+  }
 }

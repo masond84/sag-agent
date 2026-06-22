@@ -9,9 +9,14 @@ export interface SkillMeta {
 }
 
 export const SKILL_META: Record<string, SkillMeta> = {
+  "gmail-poll": {
+    implementationPath: "src/skills/gmail-poll/index.ts",
+    activityTypes: ["gmail_poll"],
+    telegramCommands: [],
+  },
   "conservice-statement": {
     implementationPath: "src/skills/conservice/index.ts",
-    activityTypes: ["gmail_poll", "gmail_bill_processed"],
+    activityTypes: ["gmail_bill_processed"],
     telegramCommands: ["/skills"],
   },
   "focus-companion": {
