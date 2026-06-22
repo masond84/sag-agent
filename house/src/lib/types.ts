@@ -107,13 +107,17 @@ export interface ActivityEvent {
 
 export type FaceState = "idle" | "listening" | "speaking" | "thinking";
 
+/** Monochrome accent palette — subtle blue-grey shifts per branch */
 export const BRANCH_THEMES: Record<
   SkillTreeBranch["theme"],
-  { from: string; via: string; to: string; accent: string }
+  { accent: string; accentDim: string; progress: string }
 > = {
-  warm: { from: "#3d1a08", via: "#8a3a12", to: "#d4742a", accent: "#ffb86a" },
-  cool: { from: "#0a1a3d", via: "#1a4a8a", to: "#3a7ad4", accent: "#7eb8ff" },
-  teal: { from: "#0a2a2a", via: "#1a6a6a", to: "#2a9a9a", accent: "#6ee7d8" },
-  green: { from: "#0a2a14", via: "#1a6a32", to: "#3a9a52", accent: "#8ee7a0" },
-  purple: { from: "#1a0a3d", via: "#4a1a8a", to: "#7a3ad4", accent: "#c8a0ff" },
+  warm: { accent: "#a8b0c0", accentDim: "#6b7280", progress: "#9aa8be" },
+  cool: { accent: "#9aa8be", accentDim: "#64748b", progress: "#8b9cb3" },
+  teal: { accent: "#94a3b8", accentDim: "#64748b", progress: "#7d8fa8" },
+  green: { accent: "#9ca3af", accentDim: "#6b7280", progress: "#8b95a8" },
+  purple: { accent: "#a1a9b8", accentDim: "#6b7280", progress: "#9aa8be" },
 };
+
+export const UI_ACCENT = "#9aa8be";
+export const UI_ACCENT_BRIGHT = "#c8d0de";

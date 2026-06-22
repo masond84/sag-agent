@@ -10,26 +10,24 @@ interface PresenceAvatarProps {
 }
 
 export function PresenceAvatar({ state, amplitude }: PresenceAvatarProps) {
-  const scale = 1 + amplitude * 0.35;
-  const glow = 0.35 + amplitude * 0.65;
+  const scale = 1 + amplitude * 0.25;
+  const glow = 0.2 + amplitude * 0.45;
 
   return (
-    <div className="relative flex h-56 w-56 items-center justify-center">
+    <div className="relative flex h-52 w-52 items-center justify-center">
       <div
         className="absolute inset-0 rounded-full blur-3xl transition-opacity duration-150"
         style={{
           opacity: glow,
           background:
-            state === "speaking"
-              ? "radial-gradient(circle, rgba(255,184,106,0.55) 0%, transparent 70%)"
-              : "radial-gradient(circle, rgba(126,184,255,0.45) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(154,168,190,0.35) 0%, transparent 70%)",
         }}
       />
       <div
-        className="relative flex h-40 w-40 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-slate-800/80 to-slate-950/90 shadow-nebula transition-transform duration-75"
+        className="relative flex h-36 w-36 items-center justify-center rounded-full border border-sag-border bg-gradient-to-br from-white/[0.06] to-white/[0.02] shadow-soft transition-transform duration-75"
         style={{ transform: `scale(${scale})` }}
       >
-        <div className="absolute inset-3 rounded-full border border-white/5" />
+        <div className="absolute inset-3 rounded-full border border-white/[0.04]" />
         <div className="flex flex-col items-center gap-3">
           <div className="flex gap-4">
             <Eye state={state} />
@@ -47,7 +45,7 @@ function Eye({ state }: { state: FaceState }) {
   const blink = state === "idle";
   return (
     <div
-      className={`h-3 w-3 rounded-full bg-sag-star shadow-[0_0_12px_rgba(245,240,220,0.8)] transition-all duration-300 ${
+      className={`h-2.5 w-2.5 rounded-full bg-sag-glow shadow-[0_0_10px_rgba(180,192,212,0.5)] transition-all duration-300 ${
         blink ? "animate-pulse" : ""
       }`}
     />
@@ -55,12 +53,12 @@ function Eye({ state }: { state: FaceState }) {
 }
 
 function Mouth({ amplitude, state }: { amplitude: number; state: FaceState }) {
-  const open = state === "speaking" ? 4 + amplitude * 18 : state === "thinking" ? 3 : 2;
+  const open = state === "speaking" ? 4 + amplitude * 16 : state === "thinking" ? 3 : 2;
   return (
     <div
-      className="rounded-full bg-sag-star/90 transition-all duration-75"
+      className="rounded-full bg-sag-glow/90 transition-all duration-75"
       style={{
-        width: state === "speaking" ? 18 + amplitude * 10 : 14,
+        width: state === "speaking" ? 16 + amplitude * 8 : 12,
         height: open,
       }}
     />
@@ -69,15 +67,15 @@ function Mouth({ amplitude, state }: { amplitude: number; state: FaceState }) {
 
 function OrbitalRing() {
   return (
-    <svg className="absolute inset-0 h-full w-full animate-[spin_24s_linear_infinite]" viewBox="0 0 200 200">
+    <svg className="absolute inset-0 h-full w-full animate-[spin_28s_linear_infinite]" viewBox="0 0 200 200">
       <circle
         cx="100"
         cy="100"
         r="92"
         fill="none"
-        stroke="rgba(126,184,255,0.15)"
-        strokeDasharray="4 8"
-        strokeWidth="1"
+        stroke="rgba(154,168,190,0.12)"
+        strokeDasharray="3 10"
+        strokeWidth="0.75"
       />
     </svg>
   );
@@ -114,13 +112,15 @@ export function FacePanel({ caption, state }: FacePanelProps) {
   }, [state]);
 
   return (
-    <section className="flex flex-col items-center gap-6 rounded-2xl border border-white/10 bg-sag-panel/80 p-8 backdrop-blur-sm">
-      <header className="w-full text-center">
-        <p className="text-xs uppercase tracking-[0.35em] text-sag-glow/70">SAG Presence</p>
-        <h2 className="mt-1 font-display text-2xl text-sag-star">Tier 1 — Voice Shell</h2>
+    <section className="flex flex-col items-center gap-6 border-b border-sag-border pb-8">
+      <header className="w-full space-y-1 text-center">
+        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-sag-muted">
+          SAG Presence
+        </p>
+        <h2 className="text-lg font-medium tracking-tight text-sag-text">Tier 1 — Voice Shell</h2>
       </header>
       <PresenceAvatar state={state} amplitude={amplitude} />
-      <p className="min-h-[4.5rem] max-w-md text-center text-sm leading-relaxed text-white/75">
+      <p className="min-h-[4rem] max-w-[260px] text-center text-sm leading-relaxed text-sag-muted">
         {caption || "Waiting for SAG to speak…"}
       </p>
       <StatusBadge state={state} />
@@ -135,15 +135,9 @@ function StatusBadge({ state }: { state: FaceState }) {
     speaking: "Speaking",
     thinking: "Thinking",
   };
-  const colors: Record<FaceState, string> = {
-    idle: "bg-white/10 text-white/60",
-    listening: "bg-teal-500/20 text-teal-200",
-    speaking: "bg-amber-500/20 text-amber-200",
-    thinking: "bg-blue-500/20 text-blue-200",
-  };
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs uppercase tracking-wider ${colors[state]}`}>
+    <span className="rounded-md border border-sag-border bg-white/[0.03] px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-sag-muted">
       {labels[state]}
     </span>
   );
