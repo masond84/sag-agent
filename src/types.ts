@@ -108,6 +108,8 @@ export interface ScheduledSkillResult {
   message: string;
   type: "report" | "alert" | "briefing";
   bypassDryRun?: boolean;
+  /** When false, Telegram still sends but House TTS is skipped. */
+  speak?: boolean;
 }
 
 // Scheduled skill interface detailing execution and configuration.
