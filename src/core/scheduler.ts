@@ -47,11 +47,11 @@ async function processScheduledSkill(
       return;
     }
     await sendNotification(result.message);
-    log("info", `${result.type} sent via ${getActiveNotifierLabel()}`);
+    log("info", `${skill.config.name} sent via ${getActiveNotifierLabel()}`);
     return;
   }
 
-  await sendPreparedNotification(result.message, config, result.type === "alert" ? "Watchdog alert" : "Heartbeat");
+  await sendPreparedNotification(result.message, config, skill.config.name);
 }
 
 export async function runScheduledTick(

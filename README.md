@@ -69,6 +69,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 
 | Command | Description |
 |---------|-------------|
+| `npm run test:conservice` | Parse Conservice bill fixture (no secrets required) |
 | `npm run dev` | Run worker with hot reload |
 | `npm run worker:once` | Single schedule + email cycle |
 | `npm run test:telegram` | Test Telegram send |
