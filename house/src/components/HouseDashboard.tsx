@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { FacePanel, speakText } from "@/components/FacePanel";
-import { SkillDetailPanel } from "@/components/SkillDetailPanel";
 import { SkillTreeGrid } from "@/components/SkillTreeGrid";
-import type { FaceState, HouseEvent, SkillTreeBranch, SkillTreeNode, SkillTreePayload, WorkerHealth } from "@/lib/types";
+import type { FaceState, HouseEvent, SkillTreeNode, SkillTreePayload, WorkerHealth } from "@/lib/types";
 import { createWorkerEventSource, fetchSkillTree, fetchWorkerHealth } from "@/lib/worker";
 
 export function HouseDashboard() {
@@ -17,7 +16,7 @@ export function HouseDashboard() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SkillTreeNode | null>(null);
-  const [selectedBranch, setSelectedBranch] = useState<SkillTreeBranch | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const refreshSkillTree = useCallback(async () => {
@@ -91,20 +90,22 @@ export function HouseDashboard() {
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10">
-      <header className="flex flex-col gap-4 border-b border-white/10 pb-8 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-sag-glow/60">SAG House</p>
-          <h1 className="font-display text-4xl text-sag-star md:text-5xl">Home Base</h1>
-          <p className="mt-2 max-w-xl text-sm text-white/50">
-            Skill constellation, live activity, and Tier 1 presence shell. Photoreal face (Tier 3) plugs in later.
+    <div className="mx-auto flex max-w-6xl flex-col gap-12 px-5 py-10 md:px-8 md:py-14">
+      <header className="flex flex-col gap-6 border-b border-sag-border pb-10 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-sag-muted">
+            SAG House
+          </p>
+          <h1 className="text-3xl font-medium tracking-tight text-sag-text md:text-4xl">
+            Home Base
+          </h1>
+          <p className="max-w-lg text-sm leading-relaxed text-sag-muted">
+            Skill constellation, live activity, and Tier 1 presence shell. Photoreal face plugs in
+            later.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusPill
-            label={connected ? "Stream live" : "Stream offline"}
-            ok={connected}
-          />
+        <div className="flex flex-wrap items-center gap-2.5">
+          <StatusPill label={connected ? "Stream live" : "Stream offline"} ok={connected} />
           <StatusPill
             label={health ? `${health.skills.length} skills` : "Worker offline"}
             ok={Boolean(health?.ok)}
@@ -112,40 +113,33 @@ export function HouseDashboard() {
           <button
             type="button"
             onClick={() => void testSpeech()}
-            className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs uppercase tracking-wider text-white/80 transition hover:bg-white/10"
+            className="rounded-md border border-sag-border bg-white/[0.03] px-4 py-2 text-xs font-medium text-sag-text transition hover:bg-white/[0.06]"
           >
             Test voice
           </button>
         </div>
       </header>
 
-      <div className="grid gap-8 xl:grid-cols-[1fr_320px]">
-        <div className="space-y-6">
-          <SkillTreeGrid
-            payload={skillTree}
-            loading={loading}
-            selectedNodeId={selectedNode?.id}
-            onNodeSelect={(node, branch) => {
-              setSelectedNode(node);
-              setSelectedBranch(branch);
-            }}
-          />
-          {selectedNode && selectedBranch && (
-            <SkillDetailPanel
-              node={selectedNode}
-              branch={selectedBranch}
-              onClose={() => {
-                setSelectedNode(null);
-                setSelectedBranch(null);
-              }}
-              onUpdated={() => void refreshSkillTree()}
-            />
-          )}
-        </div>
-        <div className="flex flex-col gap-6">
+      <div className="grid gap-10 xl:grid-cols-[1fr_300px] xl:gap-12">
+        <SkillTreeGrid
+          payload={skillTree}
+          loading={loading}
+          selectedBranchId={selectedBranchId}
+          selectedNode={selectedNode}
+          onNodeSelect={(node, branch) => {
+            setSelectedBranchId(branch.id);
+            setSelectedNode(node);
+          }}
+          onCloseDetail={() => {
+            setSelectedBranchId(null);
+            setSelectedNode(null);
+          }}
+          onSkillUpdated={() => void refreshSkillTree()}
+        />
+        <aside className="flex flex-col gap-8">
           <FacePanel caption={caption} state={faceState} />
           <ActivityFeed events={events} />
-        </div>
+        </aside>
       </div>
     </div>
   );
@@ -154,8 +148,10 @@ export function HouseDashboard() {
 function StatusPill({ label, ok }: { label: string; ok: boolean }) {
   return (
     <span
-      className={`rounded-full px-3 py-1.5 text-xs uppercase tracking-wider ${
-        ok ? "bg-emerald-500/15 text-emerald-200" : "bg-white/5 text-white/40"
+      className={`rounded-md border px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide ${
+        ok
+          ? "border-sag-border bg-white/[0.05] text-sag-glow"
+          : "border-sag-border bg-transparent text-sag-muted"
       }`}
     >
       {label}

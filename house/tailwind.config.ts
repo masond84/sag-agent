@@ -6,10 +6,15 @@ const config: Config = {
     extend: {
       colors: {
         sag: {
-          void: "#05060f",
-          panel: "#0c1020",
-          star: "#f5f0dc",
-          glow: "#7eb8ff",
+          bg: "#090b10",
+          surface: "rgba(255,255,255,0.03)",
+          elevated: "rgba(255,255,255,0.05)",
+          border: "rgba(255,255,255,0.08)",
+          muted: "#8b95a8",
+          text: "#e8eaef",
+          accent: "#9aa8be",
+          glow: "#b4c0d4",
+          star: "#e8eaef",
         },
       },
       fontFamily: {
@@ -17,7 +22,7 @@ const config: Config = {
         body: ["var(--font-body)", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        nebula: "0 0 40px rgba(126, 184, 255, 0.15)",
+        soft: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 32px rgba(0,0,0,0.24)",
       },
     },
   },
