@@ -2,6 +2,7 @@
 
 import type { SkillTreeBranch, SkillTreeNode, SkillTreePayload } from "@/lib/types";
 import { ConstellationCard } from "./ConstellationCard";
+import { SkillDetailPanel } from "./SkillDetailPanel";
 
 interface SkillTreeGridProps {
   payload: SkillTreePayload | null;
@@ -24,9 +25,9 @@ export function SkillTreeGrid({
 }: SkillTreeGridProps) {
   if (loading) {
     return (
-      <div className="grid gap-px overflow-hidden rounded-xl border border-sag-border bg-sag-border sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid gap-px overflow-hidden rounded-xl border border-sag-border bg-sag-border sm:grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="min-h-[260px] animate-pulse bg-sag-bg/80" />
+          <div key={index} className="min-h-[240px] animate-pulse bg-sag-bg/80" />
         ))}
       </div>
     );
@@ -43,6 +44,11 @@ export function SkillTreeGrid({
     );
   }
 
+  const selectedBranch =
+    selectedBranchId !== null && selectedBranchId !== undefined
+      ? payload.branches.find((branch) => branch.id === selectedBranchId) ?? null
+      : null;
+
   return (
     <section className="space-y-8">
       <header className="space-y-2">
@@ -58,25 +64,34 @@ export function SkillTreeGrid({
           </p>
         </div>
         <p className="max-w-xl text-sm text-sag-muted">
-          Hover for a preview. Click a node to inspect and configure within its branch.
+          Hover a node for a quick preview. Click to open full details below.
         </p>
       </header>
 
       <div className="overflow-hidden rounded-xl border border-sag-border bg-sag-surface shadow-soft backdrop-blur-sm">
-        <div className="grid auto-rows-fr gap-px bg-sag-border sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
+        <div className="grid gap-px bg-sag-border sm:grid-cols-2 lg:grid-cols-5">
           {payload.branches.map((branch) => (
             <div key={branch.id} className="bg-sag-bg/90">
               <ConstellationCard
                 branch={branch}
-                expandedNode={selectedBranchId === branch.id ? selectedNode : null}
-                selectedNodeId={selectedBranchId === branch.id ? selectedNode?.id : null}
+                isActive={selectedBranchId === branch.id}
                 onNodeSelect={onNodeSelect}
-                onCloseDetail={onCloseDetail}
-                onSkillUpdated={onSkillUpdated}
               />
             </div>
           ))}
         </div>
+
+        {selectedNode && selectedBranch && (
+          <div className="border-t border-sag-border bg-sag-bg/95">
+            <SkillDetailPanel
+              embedded
+              node={selectedNode}
+              branch={selectedBranch}
+              onClose={() => onCloseDetail?.()}
+              onUpdated={() => onSkillUpdated?.()}
+            />
+          </div>
+        )}
       </div>
     </section>
   );

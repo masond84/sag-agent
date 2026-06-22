@@ -1,108 +1,99 @@
 "use client";
 
 import { useState } from "react";
-import { SkillDetailPanel } from "@/components/SkillDetailPanel";
 import type { SkillTreeBranch, SkillTreeNode } from "@/lib/types";
+import { tooltipCopy } from "@/lib/node-tooltip";
 import { BRANCH_THEMES, UI_ACCENT, UI_ACCENT_BRIGHT } from "@/lib/types";
 
 interface ConstellationCardProps {
   branch: SkillTreeBranch;
-  expandedNode?: SkillTreeNode | null;
-  selectedNodeId?: string | null;
+  isActive?: boolean;
   onNodeSelect?: (node: SkillTreeNode, branch: SkillTreeBranch) => void;
-  onCloseDetail?: () => void;
-  onSkillUpdated?: () => void;
 }
 
-export function ConstellationCard({
-  branch,
-  expandedNode,
-  selectedNodeId,
-  onNodeSelect,
-  onCloseDetail,
-  onSkillUpdated,
-}: ConstellationCardProps) {
+export function ConstellationCard({ branch, isActive = false, onNodeSelect }: ConstellationCardProps) {
   const theme = BRANCH_THEMES[branch.theme];
   const xpPercent = branch.xpMax > 0 ? (branch.xp / branch.xpMax) * 100 : 0;
   const [hoveredNode, setHoveredNode] = useState<SkillTreeNode | null>(null);
-  const isExpanded = Boolean(expandedNode);
 
   return (
     <article
-      className={`group relative flex flex-col transition-colors duration-300 ${
-        isExpanded
-          ? "min-h-[440px] bg-sag-elevated/60 sm:col-span-2 xl:col-span-2 2xl:col-span-2"
-          : "min-h-[260px] hover:bg-white/[0.02]"
+      className={`group relative flex min-h-[240px] flex-col transition-colors duration-200 ${
+        isActive ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
       }`}
     >
-      <div className="flex min-h-0 flex-1 flex-col p-5 md:p-6">
-        {isExpanded && expandedNode ? (
-          <SkillDetailPanel
-            embedded
-            node={expandedNode}
+      <div className="flex min-h-0 flex-1 flex-col p-4 md:p-5">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-sag-muted">
+              {branch.name}
+            </p>
+            <p className="mt-0.5 font-mono text-[11px] text-sag-muted/80">
+              {branch.perksUnlocked}/{branch.perksTotal}
+            </p>
+          </div>
+          <span className="font-mono text-sm tabular-nums text-sag-text/70">{branch.level}</span>
+        </div>
+
+        <div
+          className="relative flex flex-1 items-center justify-center py-1"
+          onMouseLeave={() => setHoveredNode(null)}
+        >
+          <ConstellationSvg
             branch={branch}
-            onClose={() => onCloseDetail?.()}
-            onUpdated={() => onSkillUpdated?.()}
+            accent={theme.accent}
+            accentBright={UI_ACCENT_BRIGHT}
+            onHover={setHoveredNode}
+            onSelect={(node) => {
+              setHoveredNode(null);
+              onNodeSelect?.(node, branch);
+            }}
           />
-        ) : (
-          <>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-sag-muted">
-                  {branch.name}
-                </p>
-                <p className="mt-0.5 font-mono text-xs text-sag-muted/80">
-                  {branch.perksUnlocked}/{branch.perksTotal} perks
-                </p>
-              </div>
-              <span className="font-mono text-sm tabular-nums text-sag-text/70">{branch.level}</span>
-            </div>
+          {hoveredNode && <NodeTooltip node={hoveredNode} />}
+        </div>
 
-            <div className="relative flex flex-1 items-center justify-center py-2">
-              <ConstellationSvg
-                branch={branch}
-                accent={theme.accent}
-                accentBright={UI_ACCENT_BRIGHT}
-                selectedNodeId={selectedNodeId}
-                onHover={setHoveredNode}
-                onSelect={(node) => onNodeSelect?.(node, branch)}
-              />
-              {hoveredNode && <NodeTooltip node={hoveredNode} />}
-            </div>
-
-            <footer className="mt-4 space-y-2.5">
-              <div className="h-px w-full bg-gradient-to-r from-transparent via-sag-border to-transparent" />
-              <div className="h-[3px] overflow-hidden rounded-full bg-white/[0.06]">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-sag-muted/40 to-sag-accent/80 transition-all duration-700"
-                  style={{ width: `${xpPercent}%` }}
-                />
-              </div>
-            </footer>
-          </>
-        )}
+        <footer className="mt-3 space-y-2">
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-sag-border to-transparent" />
+          <div className="h-[3px] overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sag-muted/40 to-sag-accent/80 transition-all duration-700"
+              style={{ width: `${xpPercent}%` }}
+            />
+          </div>
+        </footer>
       </div>
+      {isActive && (
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sag-accent/50 to-transparent" />
+      )}
     </article>
   );
 }
 
 function NodeTooltip({ node }: { node: SkillTreeNode }) {
+  const meta = [node.skillName, node.skillKind].filter(Boolean).join(" · ");
+  const copy = tooltipCopy(node.id, node.description);
+  const showBelow = node.y < 30;
+
   return (
     <div
-      className="pointer-events-none absolute bottom-0 left-1/2 z-20 w-[min(100%,240px)] -translate-x-1/2 rounded-lg border border-sag-border bg-sag-bg/95 px-4 py-3 shadow-soft backdrop-blur-md"
+      className="pointer-events-none absolute z-30 min-w-[160px] max-w-[240px] rounded-md border border-sag-border bg-sag-bg/95 px-3 py-2.5 shadow-soft backdrop-blur-md"
+      style={{
+        left: `${node.x}%`,
+        top: `${node.y}%`,
+        transform: showBelow
+          ? "translate(-50%, calc(100% + 10px))"
+          : "translate(-50%, calc(-100% - 10px))",
+      }}
       role="tooltip"
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-sag-text">{node.label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium leading-snug text-sag-text">{node.label}</p>
         <StatusChip status={node.status} />
       </div>
-      {node.skillName && (
-        <p className="mt-1.5 text-[10px] uppercase tracking-wider text-sag-muted">
-          {node.skillName}
-          {node.skillKind ? ` · ${node.skillKind}` : ""}
-        </p>
+      {meta && (
+        <p className="mt-1 text-[10px] uppercase tracking-wide text-sag-muted">{meta}</p>
       )}
-      <p className="mt-2 text-xs leading-relaxed text-sag-muted">{node.description}</p>
+      <p className="mt-1.5 text-[11px] leading-snug text-sag-muted">{copy}</p>
     </div>
   );
 }
@@ -120,7 +111,7 @@ function StatusChip({ status }: { status: SkillTreeNode["status"] }) {
   };
 
   return (
-    <span className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wide ${styles[status]}`}>
+    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${styles[status]}`}>
       {labels[status]}
     </span>
   );
@@ -130,21 +121,22 @@ function ConstellationSvg({
   branch,
   accent,
   accentBright,
-  selectedNodeId,
   onHover,
   onSelect,
 }: {
   branch: SkillTreeBranch;
   accent: string;
   accentBright: string;
-  selectedNodeId?: string | null;
   onHover: (node: SkillTreeNode | null) => void;
   onSelect: (node: SkillTreeNode) => void;
 }) {
   const nodeMap = new Map(branch.nodes.map((node) => [node.id, node]));
 
   return (
-    <svg viewBox="0 0 100 100" className="h-full w-full max-h-[160px]">
+    <svg
+      viewBox="0 0 100 100"
+      className="h-full w-full max-h-[140px] select-none outline-none [&_*]:outline-none"
+    >
       {branch.edges.map(([from, to]) => {
         const a = nodeMap.get(from);
         const b = nodeMap.get(to);
@@ -175,17 +167,6 @@ function ConstellationSvg({
         >
           {node.unlocked && (
             <circle cx={node.x} cy={node.y} r={3.5} fill={accent} opacity={0.2} />
-          )}
-          {selectedNodeId === node.id && (
-            <circle
-              cx={node.x}
-              cy={node.y}
-              r={5.5}
-              fill="none"
-              stroke={accentBright}
-              strokeOpacity={0.7}
-              strokeWidth={0.6}
-            />
           )}
           <circle cx={node.x} cy={node.y} r={5} fill="transparent" />
           <circle

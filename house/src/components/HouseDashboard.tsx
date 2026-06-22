@@ -127,6 +127,11 @@ export function HouseDashboard() {
           selectedBranchId={selectedBranchId}
           selectedNode={selectedNode}
           onNodeSelect={(node, branch) => {
+            if (selectedBranchId === branch.id && selectedNode?.id === node.id) {
+              setSelectedBranchId(null);
+              setSelectedNode(null);
+              return;
+            }
             setSelectedBranchId(branch.id);
             setSelectedNode(node);
           }}
