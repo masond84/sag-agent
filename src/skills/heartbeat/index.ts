@@ -1,5 +1,4 @@
 import { logActivity } from "../../core/activity-log.js";
-import type { AgentHealthContext, ScheduledSkill, ScheduledSkillResult } from "../../types.js";
 import { buildAliveReportMessage, buildRecoveryMessage } from "../../core/heartbeat-message.js";
 import {
   getLastHeartbeatReportAt,
@@ -7,52 +6,63 @@ import {
   markHeartbeatReported,
   markWatchdogAlerted,
 } from "../../core/state.js";
+import type {
+  AgentHealthContext,
+  ScheduledSkill,
+  ScheduledSkillConfig,
+  ScheduledSkillResult,
+} from "../../types.js";
+
+type HeartbeatSchedule = ScheduledSkillConfig["schedule"];
 
 const DAY_MS = 86_400_000;
 
-function getReportIntervalMs(): number {
-  return Number(process.env.HEARTBEAT_REPORT_INTERVAL_MS ?? DAY_MS);
+function getReportIntervalMs(schedule?: HeartbeatSchedule): number {
+  return Number(process.env.HEARTBEAT_REPORT_INTERVAL_MS ?? schedule?.reportIntervalMs ?? DAY_MS);
 }
 
-function getStaleAfterMs(): number {
-  return Number(process.env.HEARTBEAT_STALE_AFTER_MS ?? DAY_MS);
+function getStaleAfterMs(schedule?: HeartbeatSchedule): number {
+  return Number(process.env.HEARTBEAT_STALE_AFTER_MS ?? schedule?.staleAfterMs ?? DAY_MS);
 }
 
-function getAlertCooldownMs(): number {
-  return Number(process.env.HEARTBEAT_ALERT_COOLDOWN_MS ?? DAY_MS);
+function getAlertCooldownMs(schedule?: HeartbeatSchedule): number {
+  return Number(process.env.HEARTBEAT_ALERT_COOLDOWN_MS ?? schedule?.alertCooldownMs ?? DAY_MS);
 }
 
-async function shouldSendReport(): Promise<boolean> {
+async function shouldSendReport(schedule?: HeartbeatSchedule): Promise<boolean> {
   const lastReportAt = await getLastHeartbeatReportAt();
   if (!lastReportAt) {
     return true;
   }
 
   const elapsedMs = Date.now() - new Date(lastReportAt).getTime();
-  return elapsedMs >= getReportIntervalMs();
+  return elapsedMs >= getReportIntervalMs(schedule);
 }
 
-async function shouldSendStaleAlert(): Promise<boolean> {
+async function shouldSendStaleAlert(schedule?: HeartbeatSchedule): Promise<boolean> {
   const lastAlertAt = await getLastWatchdogAlertAt();
   if (!lastAlertAt) {
     return true;
   }
 
   const elapsedMs = Date.now() - new Date(lastAlertAt).getTime();
-  return elapsedMs >= getAlertCooldownMs();
+  return elapsedMs >= getAlertCooldownMs(schedule);
 }
 
-function isWorkerStale(previousLastRunAt?: string): boolean {
+function isWorkerStale(previousLastRunAt: string | undefined, schedule?: HeartbeatSchedule): boolean {
   if (!previousLastRunAt) {
     return false;
   }
 
   const elapsedMs = Date.now() - new Date(previousLastRunAt).getTime();
-  return elapsedMs >= getStaleAfterMs();
+  return elapsedMs >= getStaleAfterMs(schedule);
 }
 
-async function runHeartbeat(context: AgentHealthContext): Promise<ScheduledSkillResult | null> {
-  if (isWorkerStale(context.previousLastRunAt) && (await shouldSendStaleAlert())) {
+async function runHeartbeat(
+  context: AgentHealthContext,
+  schedule?: HeartbeatSchedule,
+): Promise<ScheduledSkillResult | null> {
+  if (isWorkerStale(context.previousLastRunAt, schedule) && (await shouldSendStaleAlert(schedule))) {
     await markWatchdogAlerted();
     await logActivity("heartbeat_recovery", "Worker recovery alert — SAG came back online");
 
@@ -62,7 +72,7 @@ async function runHeartbeat(context: AgentHealthContext): Promise<ScheduledSkill
     };
   }
 
-  if (!(await shouldSendReport())) {
+  if (!(await shouldSendReport(schedule))) {
     return null;
   }
 
@@ -83,5 +93,7 @@ export const heartbeatSkill: ScheduledSkill = {
     enabled: true,
     kind: "scheduled",
   },
-  run: runHeartbeat,
+  async run(context) {
+    return runHeartbeat(context, this.config.schedule);
+  },
 };
