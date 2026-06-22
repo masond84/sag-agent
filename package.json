@@ -21,6 +21,7 @@
     "test:purge-agent-memories": "tsx src/scripts/test-purge-agent-memories.ts",
     "test:dev": "tsx src/scripts/test-dev.ts",
     "test:dev-task": "tsx src/scripts/test-dev-task.ts",
+    "test:speech-policy": "tsx src/scripts/test-speech-policy.ts",
     "test:orchestrator": "tsx src/scripts/test-orchestrator.ts",
     "test:telegram": "tsx src/scripts/test-telegram.ts",
     "telegram:chat-id": "tsx src/scripts/telegram-chat-id.ts",

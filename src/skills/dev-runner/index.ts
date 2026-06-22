@@ -26,7 +26,7 @@ export const devRunnerSkill: ScheduledSkill = {
 
     if (result.mergedPrs.length > 0) {
       if (isTelegramConfigured()) {
-        await sendNotification(message);
+        await sendNotification(message, { speechText: "SAG evolved." });
       }
       if (result.linearIssue) {
         try {
@@ -42,6 +42,6 @@ export const devRunnerSkill: ScheduledSkill = {
       return null;
     }
 
-    return { type: "report", message, bypassDryRun: true };
+    return { type: "report", message, bypassDryRun: true, speak: false };
   },
 };

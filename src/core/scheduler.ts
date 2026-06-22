@@ -12,7 +12,12 @@ function log(level: WorkerConfig["logLevel"], message: string): void {
   }
 }
 
-async function sendPreparedNotification(body: string, config: WorkerConfig, label: string): Promise<void> {
+async function sendPreparedNotification(
+  body: string,
+  config: WorkerConfig,
+  label: string,
+  skipSpeech = false,
+): Promise<void> {
   if (config.dryRun) {
     log("info", "DRY_RUN=true — notification not sent");
     return;
@@ -23,7 +28,7 @@ async function sendPreparedNotification(body: string, config: WorkerConfig, labe
     return;
   }
 
-  await sendNotification(body);
+  await sendNotification(body, skipSpeech ? { speak: false } : undefined);
   log("info", `${label} sent via ${getActiveNotifierLabel()}`);
 }
 
@@ -46,12 +51,12 @@ async function processScheduledSkill(
       log("warn", `${getActiveNotifierLabel()} not configured — notification not sent`);
       return;
     }
-    await sendNotification(result.message);
+    await sendNotification(result.message, result.speak === false ? { speak: false } : undefined);
     log("info", `${skill.config.name} sent via ${getActiveNotifierLabel()}`);
     return;
   }
 
-  await sendPreparedNotification(result.message, config, skill.config.name);
+  await sendPreparedNotification(result.message, config, skill.config.name, result.speak === false);
 }
 
 export async function runScheduledTick(

@@ -1,3 +1,5 @@
+import { resolveSpeakableText } from "./speech-policy.js";
+
 export type HouseEventKind = "speech" | "activity" | "status" | "connected";
 
 export interface HouseEvent {
@@ -48,14 +50,14 @@ export function publishHouseSpeech(
   speech: string,
   meta?: Record<string, string | number | boolean>,
 ): void {
-  const trimmed = speech.trim();
-  if (!trimmed) {
+  const speakable = resolveSpeakableText(speech, meta);
+  if (!speakable) {
     return;
   }
 
   publishHouseEvent("speech", {
-    speech: trimmed,
-    text: trimmed,
+    speech: speakable,
+    text: speakable,
     meta,
   });
 }
