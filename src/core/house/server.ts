@@ -10,6 +10,8 @@ import {
   type HouseEvent,
 } from "./events.js";
 import { buildSkillTreePayload } from "./skill-tree.js";
+import { buildSkillNodeDetail, toggleSkillEnabled } from "./skill-detail.js";
+import { listAllSkillConfigs } from "./skill-config.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 
@@ -53,7 +55,7 @@ async function handleRequest(
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     });
     res.end();
@@ -84,6 +86,50 @@ async function handleRequest(
   if (path === "/skill-tree" && req.method === "GET") {
     const context = await getContext();
     sendJson(res, 200, buildSkillTreePayload(context.skills));
+    return;
+  }
+
+  const skillNodeMatch = path.match(/^\/skill-node\/([^/]+)$/);
+  if (skillNodeMatch && req.method === "GET") {
+    const context = await getContext();
+    const detail = await buildSkillNodeDetail(skillNodeMatch[1]!, context.skills);
+    if (!detail) {
+      sendJson(res, 404, { error: "Node not found" });
+      return;
+    }
+    sendJson(res, 200, detail);
+    return;
+  }
+
+  const skillConfigMatch = path.match(/^\/skills\/([^/]+)$/);
+  if (skillConfigMatch && req.method === "PATCH") {
+    const raw = await readBody(req);
+    let enabled = false;
+    try {
+      const parsed = JSON.parse(raw) as { enabled?: boolean };
+      enabled = Boolean(parsed.enabled);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    try {
+      const result = await toggleSkillEnabled(skillConfigMatch[1]!, enabled);
+      publishHouseEvent("status", {
+        text: `Skill ${result.skillId} ${enabled ? "enabled" : "disabled"}`,
+        meta: { skillId: result.skillId, enabled },
+      });
+      sendJson(res, 200, result);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/skills" && req.method === "GET") {
+    const configs = await listAllSkillConfigs();
+    sendJson(res, 200, { skills: configs });
     return;
   }
 

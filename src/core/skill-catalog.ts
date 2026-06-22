@@ -1,6 +1,6 @@
 import type { SkillSummary } from "../types.js";
 
-const SKILL_DESCRIPTIONS: Record<string, string> = {
+export const SKILL_DESCRIPTIONS: Record<string, string> = {
   "conservice-statement":
     "Watches Gmail for Conservice utility statements and texts you a charge summary on Telegram.",
   "focus-companion":
@@ -9,10 +9,15 @@ const SKILL_DESCRIPTIONS: Record<string, string> = {
   heartbeat: "Keeps the worker monitored and sends a conversational status when SAG comes back online.",
   "telegram-commands": "This chat — answer questions, look up bills and focus, and run slash commands.",
   "morning-briefing": "Optional daily morning greeting at a configured time.",
+  "dev-runner": "Autonomous code audit — Linear, Cursor Cloud, and auto-merge when enabled.",
 };
 
-function describeSkill(skill: SkillSummary): string {
+export function describeSkill(skill: SkillSummary): string {
   return SKILL_DESCRIPTIONS[skill.id] ?? `${skill.kind} skill`;
+}
+
+export function getSkillDescription(skillId: string): string | undefined {
+  return SKILL_DESCRIPTIONS[skillId];
 }
 
 export function formatSkillCatalog(skills: SkillSummary[]): string {

@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { FacePanel, speakText } from "@/components/FacePanel";
+import { SkillDetailPanel } from "@/components/SkillDetailPanel";
 import { SkillTreeGrid } from "@/components/SkillTreeGrid";
-import type { FaceState, HouseEvent, SkillTreePayload, WorkerHealth } from "@/lib/types";
+import type { FaceState, HouseEvent, SkillTreeBranch, SkillTreeNode, SkillTreePayload, WorkerHealth } from "@/lib/types";
 import { createWorkerEventSource, fetchSkillTree, fetchWorkerHealth } from "@/lib/worker";
 
 export function HouseDashboard() {
@@ -15,7 +16,16 @@ export function HouseDashboard() {
   const [faceState, setFaceState] = useState<FaceState>("idle");
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<SkillTreeNode | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<SkillTreeBranch | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const refreshSkillTree = useCallback(async () => {
+    const [tree, workerHealth] = await Promise.all([fetchSkillTree(), fetchWorkerHealth()]);
+    setSkillTree(tree);
+    setHealth(workerHealth);
+    setLoading(false);
+  }, []);
 
   const enqueueSpeech = useCallback((text: string) => {
     speechQueueRef.current = speechQueueRef.current.then(async () => {
@@ -48,25 +58,22 @@ export function HouseDashboard() {
     let mounted = true;
 
     async function load() {
-      const [tree, workerHealth] = await Promise.all([fetchSkillTree(), fetchWorkerHealth()]);
+      await refreshSkillTree();
       if (!mounted) {
         return;
       }
-      setSkillTree(tree);
-      setHealth(workerHealth);
-      setLoading(false);
     }
 
     void load();
     const refresh = setInterval(() => {
-      void load();
+      void refreshSkillTree();
     }, 60_000);
 
     return () => {
       mounted = false;
       clearInterval(refresh);
     };
-  }, []);
+  }, [refreshSkillTree]);
 
   useEffect(() => {
     const source = createWorkerEventSource(handleEvent);
@@ -113,7 +120,28 @@ export function HouseDashboard() {
       </header>
 
       <div className="grid gap-8 xl:grid-cols-[1fr_320px]">
-        <SkillTreeGrid payload={skillTree} loading={loading} />
+        <div className="space-y-6">
+          <SkillTreeGrid
+            payload={skillTree}
+            loading={loading}
+            selectedNodeId={selectedNode?.id}
+            onNodeSelect={(node, branch) => {
+              setSelectedNode(node);
+              setSelectedBranch(branch);
+            }}
+          />
+          {selectedNode && selectedBranch && (
+            <SkillDetailPanel
+              node={selectedNode}
+              branch={selectedBranch}
+              onClose={() => {
+                setSelectedNode(null);
+                setSelectedBranch(null);
+              }}
+              onUpdated={() => void refreshSkillTree()}
+            />
+          )}
+        </div>
         <div className="flex flex-col gap-6">
           <FacePanel caption={caption} state={faceState} />
           <ActivityFeed events={events} />
