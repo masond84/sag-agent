@@ -44,13 +44,28 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
+  return proxyWorkerRequest(request, context, "POST");
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ path: string[] }> },
+): Promise<Response> {
+  return proxyWorkerRequest(request, context, "PATCH");
+}
+
+async function proxyWorkerRequest(
+  request: NextRequest,
+  context: { params: Promise<{ path: string[] }> },
+  method: "POST" | "PATCH",
+): Promise<Response> {
   const { path } = await context.params;
   const suffix = path.join("/");
   const target = `${getWorkerBaseUrl()}/${suffix}`;
   const body = await request.text();
 
   const upstream = await fetch(target, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body,
     cache: "no-store",

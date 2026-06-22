@@ -9,13 +9,19 @@ export interface HouseEvent {
   meta?: Record<string, string | number | boolean>;
 }
 
+export type SkillNodeStatus = "unlocked" | "locked" | "planned";
+
 export interface SkillTreeNode {
   id: string;
   label: string;
   x: number;
   y: number;
   unlocked: boolean;
+  status: SkillNodeStatus;
+  description: string;
   skillId?: string;
+  skillName?: string;
+  skillKind?: string;
 }
 
 export interface SkillTreeBranch {
@@ -43,6 +49,53 @@ export interface WorkerHealth {
   gmailConfigured: boolean;
   telegramConfigured: boolean;
   skills: Array<{ id: string; name: string; kind: string }>;
+}
+
+export interface SkillNodeDetail {
+  nodeId: string;
+  label: string;
+  description: string;
+  status: SkillNodeStatus;
+  branchId: string;
+  branchName: string;
+  skillId?: string;
+  skillName?: string;
+  skillKind?: string;
+  configurable: boolean;
+  enabled?: boolean;
+  configPath?: string;
+  implementationPath?: string;
+  activityTypes: string[];
+  recentActivity: ActivityEvent[];
+  telegramCommands: string[];
+  relatedNodes: Array<{
+    nodeId: string;
+    label: string;
+    branchId: string;
+    branchName: string;
+    skillId?: string;
+  }>;
+  disableImpact?: {
+    affectedNodes: Array<{
+      nodeId: string;
+      label: string;
+      branchId: string;
+      branchName: string;
+      skillId?: string;
+    }>;
+    relatedEnabledSkills: Array<{ id: string; name: string }>;
+    warnings: string[];
+    critical: boolean;
+  };
+}
+
+export interface ToggleSkillResult {
+  ok: boolean;
+  skillId: string;
+  enabled: boolean;
+  configPath: string;
+  restart: { attempted: boolean; success: boolean; message: string };
+  disableImpact?: SkillNodeDetail["disableImpact"];
 }
 
 export interface ActivityEvent {

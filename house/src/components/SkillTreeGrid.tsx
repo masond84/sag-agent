@@ -1,14 +1,16 @@
 "use client";
 
-import type { SkillTreePayload } from "@/lib/types";
+import type { SkillTreeBranch, SkillTreeNode, SkillTreePayload } from "@/lib/types";
 import { ConstellationCard } from "./ConstellationCard";
 
 interface SkillTreeGridProps {
   payload: SkillTreePayload | null;
   loading?: boolean;
+  selectedNodeId?: string | null;
+  onNodeSelect?: (node: SkillTreeNode, branch: SkillTreeBranch) => void;
 }
 
-export function SkillTreeGrid({ payload, loading }: SkillTreeGridProps) {
+export function SkillTreeGrid({ payload, loading, selectedNodeId, onNodeSelect }: SkillTreeGridProps) {
   if (loading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
@@ -37,6 +39,7 @@ export function SkillTreeGrid({ payload, loading }: SkillTreeGridProps) {
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-sag-glow/70">Constellation Map</p>
           <h2 className="font-display text-3xl text-sag-star">SAG Skill Tree</h2>
+          <p className="mt-1 text-xs text-white/40">Click a star to inspect, configure, and toggle skills.</p>
         </div>
         <p className="text-xs text-white/40">
           Updated {new Date(payload.generatedAt).toLocaleString()}
@@ -44,7 +47,12 @@ export function SkillTreeGrid({ payload, loading }: SkillTreeGridProps) {
       </header>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
         {payload.branches.map((branch) => (
-          <ConstellationCard key={branch.id} branch={branch} />
+          <ConstellationCard
+            key={branch.id}
+            branch={branch}
+            selectedNodeId={selectedNodeId}
+            onNodeSelect={onNodeSelect}
+          />
         ))}
       </div>
     </section>

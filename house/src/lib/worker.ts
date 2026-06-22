@@ -1,4 +1,11 @@
-import type { ActivityEvent, HouseEvent, SkillTreePayload, WorkerHealth } from "./types";
+import type {
+  ActivityEvent,
+  HouseEvent,
+  SkillNodeDetail,
+  SkillTreePayload,
+  ToggleSkillResult,
+  WorkerHealth,
+} from "./types";
 
 export function getWorkerBaseUrl(): string {
   return (process.env.SAG_WORKER_URL ?? "http://127.0.0.1:9473").replace(/\/$/, "");
@@ -31,6 +38,31 @@ export async function fetchWorkerHealth(): Promise<WorkerHealth | null> {
 
 export async function fetchSkillTree(): Promise<SkillTreePayload | null> {
   return fetchWorkerJson<SkillTreePayload>("/skill-tree");
+}
+
+export async function fetchSkillNodeDetail(nodeId: string): Promise<SkillNodeDetail | null> {
+  return fetchWorkerJson<SkillNodeDetail>(`/skill-node/${encodeURIComponent(nodeId)}`);
+}
+
+export async function toggleSkill(
+  skillId: string,
+  enabled: boolean,
+): Promise<ToggleSkillResult | null> {
+  try {
+    const response = await fetch(`${getFetchBase()}/skills/${encodeURIComponent(skillId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      const payload = (await response.json()) as { error?: string };
+      throw new Error(payload.error ?? "Toggle failed");
+    }
+    return (await response.json()) as ToggleSkillResult;
+  } catch (error) {
+    throw error;
+  }
 }
 
 export async function fetchActivity(limit = 30): Promise<ActivityEvent[]> {
