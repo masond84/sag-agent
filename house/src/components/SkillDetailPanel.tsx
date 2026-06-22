@@ -80,34 +80,63 @@ export function SkillDetailPanel({
   }
 
   const shellClass = embedded
-    ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+    ? "flex flex-col"
     : "rounded-xl border border-sag-border bg-sag-elevated/80 shadow-soft backdrop-blur-md";
 
   return (
     <div className={shellClass}>
       <header
         className={`flex shrink-0 items-start justify-between gap-4 border-b border-sag-border ${
-          embedded ? "pb-5" : "px-6 py-5"
+          embedded ? "px-5 py-4 md:px-6" : "px-6 py-5"
         }`}
       >
-        <div className="min-w-0 space-y-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-sag-muted">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-medium tracking-tight text-sag-text">{node.label}</h3>
+            {detail && (
+              <>
+                <Badge label={detail.status} />
+                {detail.skillKind && <Badge label={detail.skillKind} muted />}
+              </>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] uppercase tracking-[0.15em] text-sag-muted">
             {branch.name}
+            {detail?.skillName ? ` · ${detail.skillName}` : ""}
           </p>
-          <h3 className="text-lg font-medium tracking-tight text-sag-text">{node.label}</h3>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md border border-sag-border bg-white/[0.03] px-3 py-1.5 text-xs text-sag-muted transition hover:bg-white/[0.06] hover:text-sag-text"
-        >
-          Close
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {detail?.configurable && (
+            <button
+              type="button"
+              disabled={toggling}
+              onClick={() => void handleToggle(!detail.enabled)}
+              className={`relative h-7 w-11 rounded-full transition ${
+                detail.enabled ? "bg-sag-accent/25" : "bg-white/[0.08]"
+              } ${toggling ? "opacity-50" : ""}`}
+              aria-pressed={detail.enabled}
+              aria-label={detail.enabled ? "Disable skill" : "Enable skill"}
+            >
+              <span
+                className={`absolute top-0.5 h-6 w-6 rounded-full bg-sag-accent shadow-sm transition ${
+                  detail.enabled ? "left-[18px]" : "left-0.5"
+                }`}
+              />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-sag-border bg-white/[0.03] px-3 py-1.5 text-xs text-sag-muted transition hover:bg-white/[0.06] hover:text-sag-text"
+          >
+            Close
+          </button>
+        </div>
       </header>
 
       <div
-        className={`min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain ${
-          embedded ? "py-5 pr-2" : "max-h-[70vh] px-6 py-5"
+        className={`space-y-5 ${
+          embedded ? "px-5 py-5 md:px-6 md:py-6" : "max-h-[70vh] overflow-y-auto px-6 py-5"
         }`}
       >
         {loading && <p className="text-sm text-sag-muted">Loading…</p>}
@@ -115,163 +144,133 @@ export function SkillDetailPanel({
         {notice && <p className="break-words text-sm text-sag-glow">{notice}</p>}
 
         {detail && (
-          <>
-            <section className="space-y-3">
+          <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+            <div className="space-y-4">
               <p className="text-sm leading-relaxed text-sag-muted">{detail.description}</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge label={detail.status} />
-                {detail.skillKind && <Badge label={detail.skillKind} muted />}
-                {detail.skillName && <Badge label={detail.skillName} muted />}
-              </div>
-            </section>
 
-            {detail.configurable ? (
-              <section className="space-y-4 rounded-lg border border-sag-border bg-white/[0.02] p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
-                      Skill switch
-                    </p>
-                    <p className="mt-1 text-sm text-sag-text">
-                      {detail.enabled ? "Active in worker" : "Disabled in config"}
-                    </p>
+              {confirmDisable && detail.disableImpact && (
+                <section className="space-y-3 rounded-lg border border-sag-border bg-white/[0.02] p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
+                    Disabling affects the tree
+                  </p>
+                  <ul className="space-y-1.5 text-sm leading-relaxed text-sag-muted">
+                    {detail.disableImpact.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void handleToggle(false)}
+                      disabled={toggling}
+                      className="rounded-md border border-sag-border bg-white/[0.05] px-3 py-1.5 text-xs text-sag-text hover:bg-white/[0.08]"
+                    >
+                      Confirm disable
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDisable(false)}
+                      className="rounded-md px-3 py-1.5 text-xs text-sag-muted hover:text-sag-text"
+                    >
+                      Cancel
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    disabled={toggling}
-                    onClick={() => void handleToggle(!detail.enabled)}
-                    className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                      detail.enabled ? "bg-sag-accent/30" : "bg-white/[0.08]"
-                    } ${toggling ? "opacity-50" : ""}`}
-                    aria-pressed={detail.enabled}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-6 w-6 rounded-full bg-sag-text shadow-sm transition ${
-                        detail.enabled ? "left-5" : "left-0.5"
-                      }`}
-                    />
-                  </button>
-                </div>
+                </section>
+              )}
 
-                {confirmDisable && detail.disableImpact && (
-                  <div className="space-y-3 rounded-lg border border-sag-border bg-white/[0.02] p-4">
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
-                      Disabling affects the tree
+              {!detail.configurable && (
+                <p className="text-sm text-sag-muted">
+                  Planned perk — request via{" "}
+                  <code className="rounded bg-white/[0.05] px-1.5 py-0.5 font-mono text-xs text-sag-glow">
+                    /dev
+                  </code>
+                </p>
+              )}
+
+              {detail.relatedNodes.length > 0 && (
+                <p className="text-sm text-sag-muted">
+                  Related:{" "}
+                  {detail.relatedNodes
+                    .map((related) => `${related.label} (${related.branchName})`)
+                    .join(", ")}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {(detail.configPath || detail.implementationPath) && (
+                <section className="space-y-2 rounded-lg border border-sag-border bg-white/[0.02] p-4">
+                  <h4 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
+                    Built from
+                  </h4>
+                  {detail.configPath && (
+                    <p className="font-mono text-xs leading-relaxed text-sag-text/80">
+                      {detail.configPath}
                     </p>
-                    <ul className="space-y-2 text-xs leading-relaxed text-sag-muted">
-                      {detail.disableImpact.warnings.map((warning) => (
-                        <li key={warning} className="break-words">
-                          {warning}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => void handleToggle(false)}
-                        disabled={toggling}
-                        className="rounded-md border border-sag-border bg-white/[0.05] px-3 py-1.5 text-xs text-sag-text hover:bg-white/[0.08]"
+                  )}
+                  {detail.implementationPath && (
+                    <p className="font-mono text-xs leading-relaxed text-sag-text/80">
+                      {detail.implementationPath}
+                    </p>
+                  )}
+                </section>
+              )}
+
+              {detail.telegramCommands.length > 0 && (
+                <section className="space-y-2 rounded-lg border border-sag-border bg-white/[0.02] p-4">
+                  <h4 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
+                    Telegram
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {detail.telegramCommands.map((command) => (
+                      <code
+                        key={command}
+                        className="rounded-md border border-sag-border bg-white/[0.03] px-2.5 py-1 font-mono text-xs text-sag-glow"
                       >
-                        Confirm disable
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDisable(false)}
-                        className="rounded-md px-3 py-1.5 text-xs text-sag-muted hover:text-sag-text"
-                      >
-                        Cancel
-                      </button>
-                    </div>
+                        {command}
+                      </code>
+                    ))}
                   </div>
+                </section>
+              )}
+
+              <section className="space-y-2">
+                <h4 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
+                  Recent activity
+                </h4>
+                {detail.recentActivity.length === 0 ? (
+                  <p className="text-sm text-sag-muted">No recent events.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {detail.recentActivity.slice(0, 4).map((event, index) => (
+                      <li
+                        key={`${event.at}-${index}`}
+                        className="rounded-lg border border-sag-border bg-white/[0.02] px-4 py-3"
+                      >
+                        <div className="flex justify-between gap-3 text-[11px] text-sag-muted">
+                          <span className="uppercase tracking-wide">{event.type}</span>
+                          <time className="shrink-0 tabular-nums">
+                            {new Date(event.at).toLocaleString(undefined, {
+                              month: "numeric",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </time>
+                        </div>
+                        <p className="mt-1.5 text-sm leading-relaxed text-sag-text/85">
+                          {event.summary}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </section>
-            ) : (
-              <section className="rounded-lg border border-dashed border-sag-border p-4 text-sm text-sag-muted">
-                Planned perk — not wired to config yet. Request via{" "}
-                <code className="rounded bg-white/[0.05] px-1.5 py-0.5 font-mono text-xs text-sag-glow">
-                  /dev
-                </code>
-              </section>
-            )}
-
-            {(detail.configPath || detail.implementationPath) && (
-              <section className="space-y-3">
-                <SectionLabel>Built from</SectionLabel>
-                {detail.configPath && <PathRow label="Config" value={detail.configPath} />}
-                {detail.implementationPath && <PathRow label="Code" value={detail.implementationPath} />}
-                {detail.skillId && <PathRow label="Skill ID" value={detail.skillId} />}
-              </section>
-            )}
-
-            {detail.telegramCommands.length > 0 && (
-              <section className="space-y-3">
-                <SectionLabel>Telegram</SectionLabel>
-                <div className="flex flex-wrap gap-2">
-                  {detail.telegramCommands.map((command) => (
-                    <code
-                      key={command}
-                      className="rounded-md border border-sag-border bg-white/[0.03] px-2.5 py-1 font-mono text-xs text-sag-glow"
-                    >
-                      {command}
-                    </code>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section className="space-y-3">
-              <SectionLabel>Recent activity</SectionLabel>
-              {detail.recentActivity.length === 0 ? (
-                <p className="text-sm text-sag-muted">No recent events for this skill.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {detail.recentActivity.map((event, index) => (
-                    <li
-                      key={`${event.at}-${index}`}
-                      className="rounded-lg border border-sag-border bg-white/[0.02] px-4 py-3"
-                    >
-                      <div className="flex justify-between gap-3 text-[11px] text-sag-muted">
-                        <span className="shrink-0 uppercase tracking-wide">{event.type}</span>
-                        <time className="shrink-0 tabular-nums">
-                          {new Date(event.at).toLocaleString(undefined, {
-                            month: "numeric",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </time>
-                      </div>
-                      <p className="mt-2 break-words text-sm leading-relaxed text-sag-text/85">
-                        {event.summary}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {detail.relatedNodes.length > 0 && (
-              <section className="space-y-3">
-                <SectionLabel>Related perks</SectionLabel>
-                <ul className="space-y-1.5 text-sm text-sag-muted">
-                  {detail.relatedNodes.map((related) => (
-                    <li key={related.nodeId}>
-                      {related.label} · {related.branchName}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </div>
-  );
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <h4 className="text-[11px] font-medium uppercase tracking-[0.15em] text-sag-muted">{children}</h4>
   );
 }
 
@@ -286,14 +285,5 @@ function Badge({ label, muted = false }: { label: string; muted?: boolean }) {
     >
       {label}
     </span>
-  );
-}
-
-function PathRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-sag-border bg-white/[0.02] px-4 py-3">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-sag-muted">{label}</p>
-      <p className="mt-1.5 break-all font-mono text-xs leading-relaxed text-sag-text/80">{value}</p>
-    </div>
   );
 }
