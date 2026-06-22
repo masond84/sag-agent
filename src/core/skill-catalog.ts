@@ -1,6 +1,8 @@
 import type { SkillSummary } from "../types.js";
 
 export const SKILL_DESCRIPTIONS: Record<string, string> = {
+  "gmail-poll":
+    "OAuth Gmail polling — enables email-triggered skills like Conservice bills.",
   "conservice-statement":
     "Watches Gmail for Conservice utility statements and texts you a charge summary on Telegram.",
   "focus-companion":

@@ -219,7 +219,7 @@ const BRANCH_DEFS: BranchDef[] = [
         x: 28,
         y: 62,
         requires: ["mon-root"],
-        skillId: null,
+        skillId: "gmail-poll",
       },
       {
         id: "mon-bills",
