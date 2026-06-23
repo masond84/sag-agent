@@ -60,6 +60,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `SCHEDULE_CRON` | Cron pattern for scheduled skills (default every minute) |
 | `DRY_RUN` | `true` = log email notifications without sending |
 | `DEV_RUNNER_ENABLED` | `true` = autonomous code/PR loop (requires `gh auth`) |
+| `MORNING_BRIEFING_ENABLED` | Daily 7:30 AM greeting (`false` to disable) |
 | `FOCUS_HOURLY` | `false` = anchor check-ins only (8, 13, 21) |
 | `LIFE_COMPANION_ENABLED` | Random personal texts (default 5/day, 8am–10pm) |
 | `REFLECTION_ENABLED` | Agent diary writes from activity log |
