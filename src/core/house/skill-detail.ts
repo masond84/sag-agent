@@ -12,6 +12,8 @@ import {
   getNodesForSkill,
   type TreeNodeRef,
 } from "./skill-tree.js";
+import { getSkillGoalForNode, type SkillGoal } from "./skill-goals.js";
+import { isDevRunnerEnabled } from "../dev/state.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -34,6 +36,8 @@ export interface SkillNodeDetail {
   telegramCommands: string[];
   relatedNodes: TreeNodeRef[];
   disableImpact?: DisableImpact;
+  skillGoal?: SkillGoal;
+  requestBuildAvailable?: boolean;
 }
 
 export interface DisableImpact {
@@ -73,6 +77,7 @@ export async function buildSkillNodeDetail(
 
   const status = resolveDetailStatus(def, config, activeById);
   const relatedNodes = def.skillId ? getNodesForSkill(def.skillId) : [];
+  const skillGoal = await getSkillGoalForNode(def.id);
 
   const detail: SkillNodeDetail = {
     nodeId: def.id,
@@ -94,6 +99,10 @@ export async function buildSkillNodeDetail(
     recentActivity: filteredActivity.slice(-8).reverse(),
     telegramCommands: meta?.telegramCommands ?? [],
     relatedNodes: relatedNodes.filter((node) => node.nodeId !== def.id),
+    skillGoal: skillGoal ?? undefined,
+    requestBuildAvailable: Boolean(
+      skillGoal && isDevRunnerEnabled() && status === "planned",
+    ),
   };
 
   if (def.skillId && config?.enabled) {

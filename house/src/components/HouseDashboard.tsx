@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { DevStatusPanel } from "@/components/DevStatusPanel";
 import { FacePanel, speakText } from "@/components/FacePanel";
 import { SkillTreeGrid } from "@/components/SkillTreeGrid";
 import type { FaceState, HouseEvent, SkillTreeNode, SkillTreePayload, WorkerHealth } from "@/lib/types";
@@ -142,6 +143,7 @@ export function HouseDashboard() {
           onSkillUpdated={() => void refreshSkillTree()}
         />
         <aside className="flex flex-col gap-8">
+          <DevStatusPanel />
           <FacePanel caption={caption} state={faceState} />
           <ActivityFeed events={events} />
         </aside>

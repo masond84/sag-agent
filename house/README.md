@@ -48,3 +48,10 @@ Set project root to `house/`. Set `SAG_WORKER_URL` to a reachable worker endpoin
 | `GET /skill-tree` | Constellation branches from enabled skills |
 | `GET /activity` | Recent activity log |
 | `POST /speech` | Push test speech to face |
+| `GET /dev/status` | Dev runner queue and last merge |
+| `GET /skill-goals` | Planned skill-tree build backlog |
+| `POST /skill-goals/:nodeId/request` | Queue a planned perk for dev runner |
+
+## Skill goals
+
+Planned tree nodes (grey perks) are listed in `config/skill-goals.yaml`. In House, click a planned node and use **Request build** to queue a dev-runner task with acceptance criteria.

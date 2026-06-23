@@ -1,6 +1,8 @@
 import type {
   ActivityEvent,
+  DevStatusPayload,
   HouseEvent,
+  RequestSkillBuildResult,
   SkillNodeDetail,
   SkillTreePayload,
   ToggleSkillResult,
@@ -68,6 +70,22 @@ export async function toggleSkill(
 export async function fetchActivity(limit = 30): Promise<ActivityEvent[]> {
   const payload = await fetchWorkerJson<{ events: ActivityEvent[] }>(`/activity?limit=${limit}`);
   return payload?.events ?? [];
+}
+
+export async function fetchDevStatus(): Promise<DevStatusPayload | null> {
+  return fetchWorkerJson<DevStatusPayload>("/dev/status");
+}
+
+export async function requestSkillBuild(nodeId: string): Promise<RequestSkillBuildResult> {
+  const response = await fetch(`${getFetchBase()}/skill-goals/${encodeURIComponent(nodeId)}/request`, {
+    method: "POST",
+    cache: "no-store",
+  });
+  const payload = (await response.json()) as RequestSkillBuildResult & { error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error ?? "Request build failed");
+  }
+  return payload;
 }
 
 export function createWorkerEventSource(onEvent: (event: HouseEvent) => void): EventSource | null {

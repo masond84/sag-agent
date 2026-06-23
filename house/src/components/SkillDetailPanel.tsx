@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SkillNodeDetail, SkillTreeBranch, SkillTreeNode } from "@/lib/types";
-import { fetchSkillNodeDetail, toggleSkill } from "@/lib/worker";
+import { fetchSkillNodeDetail, requestSkillBuild, toggleSkill } from "@/lib/worker";
 
 interface SkillDetailPanelProps {
   node: SkillTreeNode;
@@ -25,6 +25,7 @@ export function SkillDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [requestingBuild, setRequestingBuild] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -76,6 +77,20 @@ export function SkillDetailPanel({
       setError(err instanceof Error ? err.message : "Toggle failed");
     } finally {
       setToggling(false);
+    }
+  }
+
+  async function handleRequestBuild() {
+    setRequestingBuild(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await requestSkillBuild(node.id);
+      setNotice(result.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request build failed");
+    } finally {
+      setRequestingBuild(false);
     }
   }
 
@@ -178,7 +193,21 @@ export function SkillDetailPanel({
                 </section>
               )}
 
-              {!detail.configurable && (
+              {!detail.configurable && detail.requestBuildAvailable && (
+                <section className="space-y-3 rounded-lg border border-sag-border bg-white/[0.02] p-4">
+                  <p className="text-sm text-sag-muted">{detail.skillGoal?.summary}</p>
+                  <button
+                    type="button"
+                    disabled={requestingBuild}
+                    onClick={() => void handleRequestBuild()}
+                    className="rounded-md border border-sag-border bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-sag-text transition hover:bg-white/[0.08] disabled:opacity-50"
+                  >
+                    {requestingBuild ? "Queueing…" : "Request build"}
+                  </button>
+                </section>
+              )}
+
+              {!detail.configurable && !detail.requestBuildAvailable && (
                 <p className="text-sm text-sag-muted">
                   Planned perk — request via{" "}
                   <code className="rounded bg-white/[0.05] px-1.5 py-0.5 font-mono text-xs text-sag-glow">

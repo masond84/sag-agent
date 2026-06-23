@@ -80,6 +80,8 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:memory` | User Mem0 smoke test |
 | `npm run test:dev` | Dev runner status |
 | `npm run launchd:install` | Mac background auto-start |
+| `npm run sag:refresh` | Pull main, rebuild worker + House, restart both |
+| `npm run house:restart` | Rebuild and restart House UI on :3000 |
 | `npm run house:dev` | SAG House web UI (requires worker house server) |
 | `npm run house:build` | Production build for house/ |
 
