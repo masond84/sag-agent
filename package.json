@@ -32,7 +32,10 @@
     "launchd:relocate": "bash scripts/launchd-relocate.sh",
     "house:install": "npm install --prefix house",
     "house:dev": "npm run dev --prefix house",
-    "house:build": "npm run build --prefix house"
+    "house:build": "npm run build --prefix house",
+    "house:start": "npm run start --prefix house -- --port 3000",
+    "house:restart": "bash scripts/house-restart.sh",
+    "sag:refresh": "bash scripts/sag-refresh.sh"
   },
   "engines": {
     "node": ">=20"

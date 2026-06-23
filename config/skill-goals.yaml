@@ -1,0 +1,34 @@
+# Planned skill-tree perks SAG can implement via dev runner (/dev or House "Request build").
+# nodeId must match src/core/house/skill-tree.ts
+
+goals:
+  - nodeId: comp-voice
+    title: Voice / TTS
+    proposedSkillId: voice-tts
+    priority: high
+    summary: Read-aloud replies for voice hardware and the House presence shell.
+    acceptance:
+      - Add config/skills/voice-tts.yaml and src/skills/voice-tts/ implementation
+      - Register the skill in src/core/registry.ts
+      - Wire skill-tree node comp-voice to the new skillId
+      - npm run build passes
+
+  - nodeId: mem-persona
+    title: Co-created Persona
+    proposedSkillId: persona
+    priority: medium
+    summary: Evolving tone and personality co-created over time in agent Mem0.
+    acceptance:
+      - Scaffold persona skill or extend reflection with persona hooks
+      - Wire mem-persona node to skillId in skill-tree.ts
+      - npm run build passes
+
+  - nodeId: com-voice-hw
+    title: Read Aloud Format
+    proposedSkillId: null
+    priority: medium
+    summary: Voice-friendly Telegram replies — short plain text, no markdown lists.
+    acceptance:
+      - Implement reply formatting in telegram/assistant path (may not need new yaml skill)
+      - Document behavior in README
+      - npm run build passes

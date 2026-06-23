@@ -12,6 +12,13 @@ import {
 import { buildSkillTreePayload } from "./skill-tree.js";
 import { buildSkillNodeDetail, toggleSkillEnabled } from "./skill-detail.js";
 import { listAllSkillConfigs } from "./skill-config.js";
+import { buildDevStatusPayload } from "./dev-status.js";
+import {
+  buildSkillGoalDevTask,
+  getSkillGoalForNode,
+  loadSkillGoals,
+} from "./skill-goals.js";
+import { isDevRunnerEnabled, queueManualDevTask } from "../dev/state.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 
@@ -200,6 +207,48 @@ async function handleRequest(
 
     publishHouseEvent("speech", { speech, text: speech, meta: { source: "manual" } });
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (path === "/dev/status" && req.method === "GET") {
+    sendJson(res, 200, await buildDevStatusPayload());
+    return;
+  }
+
+  if (path === "/skill-goals" && req.method === "GET") {
+    const goals = await loadSkillGoals();
+    sendJson(res, 200, { goals });
+    return;
+  }
+
+  const skillGoalMatch = path.match(/^\/skill-goals\/([^/]+)\/request$/);
+  if (skillGoalMatch && req.method === "POST") {
+    if (!isDevRunnerEnabled()) {
+      sendJson(res, 400, { error: "Dev runner is disabled" });
+      return;
+    }
+
+    const nodeId = decodeURIComponent(skillGoalMatch[1]!);
+    const goal = await getSkillGoalForNode(nodeId);
+    if (!goal) {
+      sendJson(res, 404, { error: "No skill goal for this node" });
+      return;
+    }
+
+    const detail = await buildSkillNodeDetail(nodeId, (await getContext()).skills);
+    if (detail?.status !== "planned") {
+      sendJson(res, 400, { error: "Node is already implemented or unlocked" });
+      return;
+    }
+
+    const task = buildSkillGoalDevTask(goal);
+    await queueManualDevTask(task);
+    sendJson(res, 200, {
+      ok: true,
+      nodeId,
+      title: goal.title,
+      message: `Queued build for ${goal.title}. Dev runner will pick it up on the next cycle.`,
+    });
     return;
   }
 

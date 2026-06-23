@@ -87,6 +87,8 @@ export interface SkillNodeDetail {
     warnings: string[];
     critical: boolean;
   };
+  skillGoal?: SkillGoalSummary;
+  requestBuildAvailable?: boolean;
 }
 
 export interface ToggleSkillResult {
@@ -96,6 +98,34 @@ export interface ToggleSkillResult {
   configPath: string;
   restart: { attempted: boolean; success: boolean; message: string };
   disableImpact?: SkillNodeDetail["disableImpact"];
+}
+
+export interface SkillGoalSummary {
+  nodeId: string;
+  title: string;
+  proposedSkillId: string | null;
+  priority: string;
+  summary: string;
+  acceptance: string[];
+}
+
+export interface RequestSkillBuildResult {
+  ok: boolean;
+  nodeId: string;
+  title: string;
+  message: string;
+}
+
+export interface DevStatusPayload {
+  enabled: boolean;
+  orchestratorMode: "local" | "cursor" | "disabled";
+  running: boolean;
+  pendingCount: number;
+  pending: Array<{ kind: string; task?: string; queuedAt: string }>;
+  postMergeQueue: Array<{ prNumber: number; mergedAt: string; title?: string }>;
+  lastRunAt?: string;
+  recentBrief?: string;
+  lastMergedPrs: number[];
 }
 
 export interface ActivityEvent {
