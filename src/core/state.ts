@@ -3,6 +3,19 @@ import path from "node:path";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const STATE_FILE = path.join(DATA_DIR, "processed-messages.json");
+const DEFAULT_PROCESSED_MESSAGE_ID_LIMIT = 1_000;
+
+function getProcessedMessageIdLimit(): number {
+  const raw = process.env.PROCESSED_MESSAGE_ID_LIMIT;
+  if (!raw) {
+    return DEFAULT_PROCESSED_MESSAGE_ID_LIMIT;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PROCESSED_MESSAGE_ID_LIMIT;
+}
+
+export const PROCESSED_MESSAGE_ID_LIMIT = getProcessedMessageIdLimit();
 
 interface AgentState {
   messageIds: string[];
@@ -17,11 +30,38 @@ async function ensureDataDir(): Promise<void> {
   await mkdir(DATA_DIR, { recursive: true });
 }
 
+function normalizeMessageIds(messageIds: string[]): string[] {
+  const seen = new Set<string>();
+  const recentUniqueIds: string[] = [];
+
+  for (let index = messageIds.length - 1; index >= 0; index -= 1) {
+    const messageId = messageIds[index];
+    if (!messageId || seen.has(messageId)) {
+      continue;
+    }
+
+    seen.add(messageId);
+    recentUniqueIds.push(messageId);
+    if (recentUniqueIds.length >= PROCESSED_MESSAGE_ID_LIMIT) {
+      break;
+    }
+  }
+
+  return recentUniqueIds.reverse();
+}
+
+function normalizeState(state: AgentState): AgentState {
+  return {
+    ...state,
+    messageIds: normalizeMessageIds(Array.isArray(state.messageIds) ? state.messageIds : []),
+  };
+}
+
 async function readState(): Promise<AgentState> {
   await ensureDataDir();
   try {
     const raw = await readFile(STATE_FILE, "utf8");
-    return JSON.parse(raw) as AgentState;
+    return normalizeState(JSON.parse(raw) as AgentState);
   } catch {
     return { messageIds: [] };
   }
@@ -29,7 +69,7 @@ async function readState(): Promise<AgentState> {
 
 async function writeState(state: AgentState): Promise<void> {
   await ensureDataDir();
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2));
+  await writeFile(STATE_FILE, JSON.stringify(normalizeState(state), null, 2));
 }
 
 export async function hasProcessed(messageId: string): Promise<boolean> {

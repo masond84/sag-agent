@@ -11,6 +11,7 @@
     "worker": "tsx src/main.ts",
     "worker:once": "tsx src/main.ts --once",
     "test:conservice": "tsx src/scripts/test-conservice.ts",
+    "test:state": "tsx src/scripts/test-state.ts",
     "test:morning": "tsx src/scripts/test-morning.ts",
     "test:heartbeat": "tsx src/scripts/test-heartbeat.ts",
     "test:focus": "tsx src/scripts/test-focus.ts",

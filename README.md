@@ -57,6 +57,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot + authorized chat |
 | `OPENAI_API_KEY` | Assistant + companion LLM replies |
 | `POLL_INTERVAL_MS` | Gmail poll interval (not chat) |
+| `PROCESSED_MESSAGE_ID_LIMIT` | Gmail dedupe ID retention cap (default 1000) |
 | `SCHEDULE_CRON` | Cron pattern for scheduled skills (default every minute) |
 | `DRY_RUN` | `true` = log email notifications without sending |
 | `DEV_RUNNER_ENABLED` | `true` = autonomous code/PR loop (requires `gh auth`) |
@@ -70,6 +71,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | Command | Description |
 |---------|-------------|
 | `npm run test:conservice` | Parse Conservice bill fixture (no secrets required) |
+| `npm run test:state` | Smoke-test local state retention |
 | `npm run dev` | Run worker with hot reload |
 | `npm run worker:once` | Single schedule + email cycle |
 | `npm run test:telegram` | Test Telegram send |
