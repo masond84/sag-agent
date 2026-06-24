@@ -1,3 +1,4 @@
+export { speakTextViaAgent, resolveVoiceAgentIdentity, SAG_SPEAK_RPC_METHOD } from "./agent-speak";
 export { speakText } from "./tts";
 export type {
   AvatarConnectionStatus,
@@ -5,6 +6,7 @@ export type {
   FaceRendererProps,
   FaceSessionConfig,
   FaceSessionStartResult,
+  LiveKitAvatarHandle,
 } from "./types";
 export { PresenceFaceRenderer } from "./presence";
 export { LiveKitAvatarRenderer } from "./livekit-avatar";

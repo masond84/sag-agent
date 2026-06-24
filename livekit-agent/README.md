@@ -23,6 +23,8 @@ python agent.py dev
 
 Keep this running while using **Face-to-face** in House.
 
+When House is in face-to-face mode, worker speech events (Telegram, focus pings) are forwarded over LiveKit RPC (`sag.speak`) so the Simli avatar lip-syncs the text.
+
 ## Simli persistence
 
 ```bash
