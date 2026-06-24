@@ -12,7 +12,7 @@ Three independent loops (same process):
 | **Schedule** | Croner (`* * * * *` by default) | Focus, life companion, reflection, morning, heartbeat, dev-runner |
 | **Email** | `POLL_INTERVAL_MS` (default 10 min) | Gmail skills (e.g. Conservice bills) |
 
-Skills are configured in `config/skills/` and implemented under `src/skills/`.
+Skills are configured in `config/skills/` and implemented under `src/skills/`. Each YAML file has an `enabled` flag that must be true for the skill to load; some skills also honor runtime env toggles (e.g. `MORNING_BRIEFING_ENABLED`).
 
 ## Companion memory
 
@@ -58,7 +58,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `OPENAI_API_KEY` | Assistant + companion LLM replies |
 | `POLL_INTERVAL_MS` | Gmail poll interval (not chat) |
 | `SCHEDULE_CRON` | Cron pattern for scheduled skills (default every minute) |
-| `DRY_RUN` | `true` = log email notifications without sending |
+| `DRY_RUN` | `true` = suppress Telegram for email bills and routine scheduled reports (e.g. heartbeat); companion briefings (morning, focus, life) bypass dry-run and still send |
 | `DEV_RUNNER_ENABLED` | `true` = autonomous code/PR loop (requires `gh auth`) |
 | `FOCUS_HOURLY` | `false` = anchor check-ins only (8, 13, 21) |
 | `LIFE_COMPANION_ENABLED` | Random personal texts (default 5/day, 8am–10pm) |
