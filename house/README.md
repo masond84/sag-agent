@@ -48,6 +48,7 @@ Set project root to `house/`. Set `SAG_WORKER_URL` to a reachable worker endpoin
 | `GET /skill-tree` | Constellation branches from enabled skills |
 | `GET /activity` | Recent activity log |
 | `POST /speech` | Push test speech to face |
+| `POST /assistant/reply` | Full SAG reply for face agent bridge (`{ text, chatId? }`) |
 | `GET /face-session/config` | Photoreal session availability |
 | `POST /face-session` | Start face-to-face LiveKit session |
 | `DELETE /face-session/:id` | End session and delete room |

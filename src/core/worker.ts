@@ -128,7 +128,7 @@ export async function runWorker(skills: LoadedSkills, config: WorkerConfig, once
   });
 
   if (!once) {
-    startHouseServer(getHealthContext);
+    startHouseServer(getHealthContext, getInteractiveContext);
   }
 
   if (!once && isTelegramConfigured() && skills.interactive.length > 0) {
