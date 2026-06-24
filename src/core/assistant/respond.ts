@@ -1,7 +1,7 @@
 import type { ChatMessage } from "../llm.js";
 import { isLlmConfigured, runAssistantTurn } from "../llm.js";
 import type { InteractiveSkillContext } from "../../types.js";
-import { assistantTools, executeAssistantTool } from "./tools.js";
+import { executeAssistantTool, getAllAssistantTools, nativeAssistantTools } from "./tools.js";
 import { appendConversationTurn, formatConversationHighlights, getConversationMessages } from "../memory/conversation.js";
 import { summarizeRecentActivity } from "../activity-log.js";
 import {
@@ -48,7 +48,7 @@ function needsRecallContext(text: string): boolean {
   return isRecallQuestion(text);
 }
 
-const LIFE_RECALL_TOOLS = assistantTools.filter((tool) => LIFE_RECALL_TOOL_NAMES.has(tool.name));
+const LIFE_RECALL_TOOLS = nativeAssistantTools.filter((tool) => LIFE_RECALL_TOOL_NAMES.has(tool.name));
 
 async function buildLifeContextBlock(
   userText: string,
@@ -123,6 +123,8 @@ async function buildSystemPrompt(
     "",
     "Use tools when you need facts you do not already have in context below.",
     "- Bills, focus, skills, status → use the matching tool",
+    "- Email search/read in Gmail → gmail__search_emails, gmail__read_email (Gmail query syntax in query)",
+    "- Stored Conservice bills already processed → get_latest_utility_bill",
     "- What you did / who you are → get_sag_recent_activity + get_agent_memories",
     "",
     recallMode
@@ -222,7 +224,7 @@ export async function respondToAssistantMessage(
   for (let step = 0; step < 3; step += 1) {
     const turn = await runAssistantTurn(
       messages,
-      forceTools && step === 0 ? LIFE_RECALL_TOOLS : assistantTools,
+      forceTools && step === 0 ? LIFE_RECALL_TOOLS : getAllAssistantTools(),
       {
         ...turnOptions,
         toolChoice: forceTools && step === 0 ? "required" : "auto",
@@ -253,7 +255,7 @@ export async function respondToAssistantMessage(
   }
 
   if (!reply) {
-    const finalTurn = await runAssistantTurn(messages, assistantTools, {
+    const finalTurn = await runAssistantTurn(messages, getAllAssistantTools(), {
       ...turnOptions,
       toolChoice: "none",
     });

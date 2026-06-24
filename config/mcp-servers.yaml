@@ -1,0 +1,15 @@
+# MCP connector registry — add servers here; SAG spawns each as a stdio child process.
+# Gmail auth: place gcp-oauth.keys.json in data/gmail-mcp/ then run npm run mcp:gmail-auth
+
+servers:
+  gmail:
+    enabled: true
+    command: npx
+    args: ["-y", "@gongrzhe/server-gmail-autoauth-mcp@latest"]
+    cwd: data/gmail-mcp
+    tool_prefix: gmail
+    # Read-only to start; remove or expand when send/label tools are trusted.
+    allowed_tools:
+      - search_emails
+      - read_email
+      - list_email_labels
