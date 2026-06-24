@@ -114,7 +114,11 @@ async function runReflection(_context: AgentHealthContext): Promise<ScheduledSki
     return null;
   }
 
-  const sinceHours = now.hour <= 13 ? now.hour + 1 : now.hour - (reflectionHours[reflectionHours.length - 2] ?? 13);
+  const slotIndex = reflectionHours.indexOf(now.hour);
+  const sinceHours =
+    slotIndex === 0
+      ? now.hour + 1
+      : now.hour - reflectionHours[slotIndex - 1];
   const [activitySummary, chatHighlights] = await Promise.all([
     summarizeRecentActivity({
       sinceHours: Math.max(sinceHours, 4),
