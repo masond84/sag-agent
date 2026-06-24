@@ -33,7 +33,7 @@ Open http://localhost:3000
 - **Worker** (`src/core/house/`) — optional localhost HTTP server (SSE + REST). Disabled by default.
 - **House** (`house/`) — Next.js frontend. Proxies worker API via `/api/worker/*`.
 - **Face (Tier 1)** — presence orb + OpenAI TTS (falls back to Web Speech API).
-- **Tier 3 photoreal** — future `FaceRenderer` swap (Simli/Tavus/LiveKit).
+- **Face (Tier 3)** — photoreal via LiveKit + Simli; on-demand **Face-to-face** in the UI. See `livekit-agent/README.md`.
 
 ## Deploy (Vercel)
 
@@ -48,6 +48,9 @@ Set project root to `house/`. Set `SAG_WORKER_URL` to a reachable worker endpoin
 | `GET /skill-tree` | Constellation branches from enabled skills |
 | `GET /activity` | Recent activity log |
 | `POST /speech` | Push test speech to face |
+| `GET /face-session/config` | Photoreal session availability |
+| `POST /face-session` | Start face-to-face LiveKit session |
+| `DELETE /face-session/:id` | End session and delete room |
 | `GET /dev/status` | Dev runner queue and last merge |
 | `GET /skill-goals` | Planned skill-tree build backlog |
 | `POST /skill-goals/:nodeId/request` | Queue a planned perk for dev runner |
