@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { DevStatusPanel } from "@/components/DevStatusPanel";
 import { FacePanel } from "@/components/FacePanel";
-import { speakText, type FaceMode, fetchFaceSessionConfig } from "@/lib/face";
+import { speakText, type FaceMode, type LiveKitAvatarHandle, fetchFaceSessionConfig } from "@/lib/face";
 import { SkillTreeGrid } from "@/components/SkillTreeGrid";
 import type { FaceState, HouseEvent, SkillTreeNode, SkillTreePayload, WorkerHealth } from "@/lib/types";
 import { createWorkerEventSource, fetchSkillTree, fetchWorkerHealth } from "@/lib/worker";
@@ -24,6 +24,7 @@ export function HouseDashboard() {
   const [photorealAvailable, setPhotorealAvailable] = useState(false);
   const [photorealError, setPhotorealError] = useState<string | null>(null);
   const [reconnectToken, setReconnectToken] = useState(0);
+  const avatarSpeakRef = useRef<LiveKitAvatarHandle | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const refreshSkillTree = useCallback(async () => {
@@ -41,6 +42,7 @@ export function HouseDashboard() {
   const enqueueSpeech = useCallback((text: string) => {
     if (faceMode === "photoreal" && photorealActive) {
       setCaption(text);
+      avatarSpeakRef.current?.speak(text);
       return;
     }
 
@@ -191,6 +193,7 @@ export function HouseDashboard() {
             photorealActive={photorealActive}
             photorealAvailable={photorealAvailable}
             reconnectToken={reconnectToken}
+            avatarSpeakRef={avatarSpeakRef}
             onFaceStateChange={setFaceState}
             onPhotorealError={setPhotorealError}
             onRequestReconnect={requestAvatarReconnect}

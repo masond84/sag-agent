@@ -6,6 +6,7 @@ import {
   PresenceFaceRenderer,
   type AvatarConnectionStatus,
   type FaceMode,
+  type LiveKitAvatarHandle,
 } from "@/lib/face";
 import type { FaceState } from "@/lib/types";
 
@@ -16,6 +17,7 @@ interface FacePanelProps {
   photorealActive: boolean;
   photorealAvailable: boolean;
   reconnectToken: number;
+  avatarSpeakRef?: React.RefObject<LiveKitAvatarHandle | null>;
   onFaceStateChange?: (state: FaceState) => void;
   onPhotorealError?: (message: string) => void;
   onAvatarStatusChange?: (status: AvatarConnectionStatus) => void;
@@ -29,6 +31,7 @@ export function FacePanel({
   photorealActive,
   photorealAvailable,
   reconnectToken,
+  avatarSpeakRef,
   onFaceStateChange,
   onPhotorealError,
   onAvatarStatusChange,
@@ -78,6 +81,7 @@ export function FacePanel({
       {mode === "photoreal" ? (
         <>
           <LiveKitAvatarRenderer
+            ref={avatarSpeakRef}
             state={state}
             caption={caption}
             amplitude={amplitude}

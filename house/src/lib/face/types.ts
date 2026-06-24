@@ -31,3 +31,7 @@ export type AvatarConnectionStatus =
   | "live"
   | "reconnecting"
   | "lost";
+
+export interface LiveKitAvatarHandle {
+  speak: (text: string) => void;
+}

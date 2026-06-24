@@ -1,29 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ConnectionState,
   Room,
   RoomEvent,
   Track,
-  type RemoteParticipant,
   type RemoteTrack,
   type RemoteTrackPublication,
 } from "livekit-client";
-import type { AvatarConnectionStatus, FaceRendererProps } from "@/lib/face/types";
+import { isAvatarVideoParticipant, speakTextViaAgent } from "@/lib/face/agent-speak";
+import type { AvatarConnectionStatus, FaceRendererProps, LiveKitAvatarHandle } from "@/lib/face/types";
 import type { FaceState } from "@/lib/types";
 import { endFaceSession, fetchFaceSessionConfig, startFaceSession } from "@/lib/face/session";
+import { stripMarkdownForSpeech } from "@/lib/worker";
 
 const AUTO_RECONNECT_DELAY_MS = 4_000;
 const MAX_AUTO_RECONNECTS = 2;
 
-function isAvatarParticipant(identity: string): boolean {
-  const id = identity.toLowerCase();
-  return id.includes("avatar") || id.includes("simli") || id.includes("agent");
-}
-
 function roomHasAvatar(room: Room): boolean {
-  return [...room.remoteParticipants.values()].some((p) => isAvatarParticipant(p.identity));
+  return [...room.remoteParticipants.values()].some((p) => isAvatarVideoParticipant(p.identity));
 }
 
 interface LiveKitAvatarRendererProps extends FaceRendererProps {
@@ -35,21 +31,26 @@ interface LiveKitAvatarRendererProps extends FaceRendererProps {
   onRequestReconnect?: () => void;
 }
 
-export function LiveKitAvatarRenderer({
-  caption,
-  sessionActive,
-  reconnectToken,
-  onStateChange,
-  onError,
-  onConnectionStatusChange,
-  onRequestReconnect,
-}: LiveKitAvatarRendererProps) {
+export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvatarRendererProps>(
+  function LiveKitAvatarRenderer(
+    {
+      caption,
+      sessionActive,
+      reconnectToken,
+      onStateChange,
+      onError,
+      onConnectionStatusChange,
+      onRequestReconnect,
+    },
+    ref,
+  ) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const connectGenerationRef = useRef(0);
   const autoReconnectCountRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const onStateChangeRef = useRef(onStateChange);
   const onErrorRef = useRef(onError);
@@ -145,6 +146,34 @@ export function LiveKitAvatarRenderer({
     onStateChangeRef.current?.("idle");
   }, [clearReconnectTimer, detachVideo, setStatus]);
 
+  const enqueueAgentSpeech = useCallback((text: string) => {
+    const cleaned = stripMarkdownForSpeech(text);
+    if (!cleaned) {
+      return;
+    }
+
+    speechQueueRef.current = speechQueueRef.current.then(async () => {
+      const room = roomRef.current;
+      if (!room || room.state !== ConnectionState.Connected) {
+        return;
+      }
+
+      onStateChangeRef.current?.("speaking");
+      try {
+        await speakTextViaAgent(room, cleaned);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        onErrorRef.current?.(`Avatar speech failed: ${detail}`);
+      } finally {
+        onStateChangeRef.current?.("listening");
+      }
+    });
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    speak: enqueueAgentSpeech,
+  }), [enqueueAgentSpeech]);
+
   useEffect(() => {
     if (!sessionActive) {
       autoReconnectCountRef.current = 0;
@@ -213,7 +242,7 @@ export function LiveKitAvatarRenderer({
       });
 
       room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-        if (isAvatarParticipant(participant.identity) && track.kind === Track.Kind.Video) {
+        if (isAvatarVideoParticipant(participant.identity) && track.kind === Track.Kind.Video) {
           autoReconnectCountRef.current = 0;
           clearReconnectTimer();
           setStatus("live");
@@ -225,20 +254,20 @@ export function LiveKitAvatarRenderer({
       room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
         if (track.kind === Track.Kind.Video) {
           track.detach();
-          if (isAvatarParticipant(participant.identity)) {
+          if (isAvatarVideoParticipant(participant.identity)) {
             handleAvatarLost();
           }
         }
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
-        if (isAvatarParticipant(participant.identity)) {
+        if (isAvatarVideoParticipant(participant.identity)) {
           syncAvatarPresence();
         }
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-        if (isAvatarParticipant(participant.identity)) {
+        if (isAvatarVideoParticipant(participant.identity)) {
           handleAvatarLost();
           return;
         }
@@ -309,11 +338,12 @@ export function LiveKitAvatarRenderer({
         )}
       </div>
       <p className="min-h-[3rem] max-w-[280px] text-center text-sm leading-relaxed text-sag-muted">
-        {caption || "Speak when the session is live. Captions may update from Telegram without restoring video."}
+        {caption || "Speak in the room, or let Telegram messages play through the avatar."}
       </p>
       <span className="rounded-md border border-sag-border bg-white/[0.03] px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-sag-muted">
         {statusLabel[avatarStatus]}
       </span>
     </div>
   );
-}
+},
+);

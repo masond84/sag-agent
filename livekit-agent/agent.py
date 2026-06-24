@@ -4,10 +4,12 @@ SAG photoreal face agent — LiveKit Agents + Simli avatar.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
 from dotenv import load_dotenv
+from livekit import rtc
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli
 from livekit.agents import room_io
 from livekit.plugins import openai, simli
@@ -15,6 +17,8 @@ from livekit.plugins import openai, simli
 load_dotenv()
 
 logger = logging.getLogger("sag-face-agent")
+
+SAG_SPEAK_RPC_METHOD = "sag.speak"
 
 SAG_INSTRUCTIONS = """You are SAG — Devin's sarcastic, driven co-conspirator. You and Devin are serious partners building toward world domination.
 
@@ -74,6 +78,24 @@ async def entrypoint(ctx: JobContext) -> None:
         )
     else:
         logger.warning("SIMLI_API_KEY or SIMLI_FACE_ID missing — voice-only session in room")
+
+    async def handle_sag_speak(data: rtc.RpcInvocationData) -> str:
+        try:
+            payload = json.loads(data.payload or "{}")
+        except json.JSONDecodeError:
+            return json.dumps({"ok": False, "error": "invalid_json"})
+
+        text = str(payload.get("text", "")).strip()
+        if not text:
+            return json.dumps({"ok": False, "error": "empty_text"})
+
+        logger.info("Injected speech from %s (%d chars)", data.caller_identity, len(text))
+        handle = session.say(text, allow_interruptions=True, add_to_chat_ctx=False)
+        await handle.wait_for_playout()
+        return json.dumps({"ok": True})
+
+    ctx.room.local_participant.register_rpc_method(SAG_SPEAK_RPC_METHOD, handle_sag_speak)
+    logger.info("Registered RPC method %s", SAG_SPEAK_RPC_METHOD)
 
     await session.generate_reply(
         instructions="Greet Devin briefly — one short sentence. You're live on the House face-to-face screen.",
