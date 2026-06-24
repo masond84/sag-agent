@@ -63,6 +63,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `FOCUS_HOURLY` | `false` = anchor check-ins only (8, 13, 21) |
 | `LIFE_COMPANION_ENABLED` | Random personal texts (default 5/day, 8am–10pm) |
 | `REFLECTION_ENABLED` | Agent diary writes from activity log |
+| `MCP_ENABLED` | `true` = spawn MCP servers from `config/mcp-servers.yaml` as assistant tools |
 | `MEM0_ENABLED` | Local or platform Mem0 for user + agent memory |
 
 ## Useful scripts
@@ -83,6 +84,8 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run sag:refresh` | Pull main, rebuild worker + House, restart both |
 | `npm run house:restart` | Rebuild and restart House UI on :3000 |
 | `npm run house:dev` | SAG House web UI (requires worker house server) |
+| `npm run test:mcp` | List MCP connectors; optional `--query="after:2026/06/24"` Gmail search |
+| `npm run mcp:gmail-auth` | One-time Gmail MCP OAuth (uses `data/gmail-mcp/`) |
 | `npm run house:build` | Production build for house/ |
 
 ## Deployment
@@ -108,3 +111,29 @@ npm run house:dev
 ```
 
 Open http://localhost:3000. See `house/README.md` for API routes and Vercel deploy notes.
+
+## MCP connectors
+
+SAG can attach external **Model Context Protocol** servers as assistant tools (stdio child processes). Connectors are declared in `config/mcp-servers.yaml` — no TypeScript changes needed to add another server.
+
+**Gmail (first connector):** `@gongrzhe/server-gmail-autoauth-mcp` exposes search/read/label tools to Telegram and House voice. Conservice bill polling is unchanged (scheduled skill).
+
+Setup:
+
+```bash
+# 1. Enable Gmail API in Google Cloud; download OAuth client JSON
+mkdir -p data/gmail-mcp
+cp ~/Downloads/client_secret_*.json data/gmail-mcp/gcp-oauth.keys.json
+
+# 2. One-time MCP auth (browser sign-in)
+npm run mcp:gmail-auth
+
+# 3. Smoke test
+npm run test:mcp
+npm run test:mcp -- --query="after:2026/06/24"
+
+# 4. Run worker — ask in Telegram: "any emails from today?"
+MCP_ENABLED=true npm run dev
+```
+
+Add more free connectors by editing `config/mcp-servers.yaml` (GitHub, Drive, etc.) and restarting the worker. Tool names are prefixed (`gmail__search_emails`) to avoid collisions with native tools.

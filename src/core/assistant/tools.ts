@@ -5,6 +5,7 @@ import { formatSkillCatalogForAssistant } from "../skill-catalog.js";
 import { formatHealthAudit } from "../health-audit.js";
 import { formatConversationHighlights } from "../memory/conversation.js";
 import { listAgentMemories, resolveMemoryUserId, searchAgentMemories } from "../memory/mem0-service.js";
+import { executeMcpTool, getMcpToolDefinitions, isMcpToolName } from "../mcp/index.js";
 import type { ToolDefinition } from "../llm.js";
 import type { InteractiveSkillContext } from "../../types.js";
 
@@ -12,7 +13,7 @@ export interface AssistantToolOptions {
   memoryUserId?: string;
 }
 
-export const assistantTools: ToolDefinition[] = [
+export const nativeAssistantTools: ToolDefinition[] = [
   {
     name: "get_agent_status",
     description: "Get current SAG health audit including host, last check, skills, Gmail/Telegram status.",
@@ -80,6 +81,13 @@ export const assistantTools: ToolDefinition[] = [
   },
 ];
 
+/** @deprecated Use getAllAssistantTools() — includes MCP connector tools when enabled. */
+export const assistantTools = nativeAssistantTools;
+
+export function getAllAssistantTools(): ToolDefinition[] {
+  return [...nativeAssistantTools, ...getMcpToolDefinitions()];
+}
+
 export async function executeAssistantTool(
   name: string,
   argsJson: string,
@@ -140,6 +148,9 @@ export async function executeAssistantTool(
       return formatConversationHighlights(memoryUserId, 8);
 
     default:
+      if (isMcpToolName(name)) {
+        return executeMcpTool(name, argsJson);
+      }
       return `Unknown tool: ${name}`;
   }
 }

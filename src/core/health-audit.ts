@@ -1,5 +1,6 @@
 import type { AgentHealthContext } from "../types.js";
 import { formatHostLabel, formatRelativeTime, formatStatusLabel } from "./health.js";
+import { formatMcpHealthSummary } from "./mcp/index.js";
 import { getMem0InitError, isMem0Enabled } from "./memory/mem0-service.js";
 
 function formatMem0StatusLabel(): string {
@@ -26,6 +27,7 @@ export function formatHealthAudit(context: AgentHealthContext): string {
     `- Gmail: ${formatStatusLabel(context.gmailConfigured)}`,
     `- Telegram: ${formatStatusLabel(context.telegramConfigured)}`,
     `- Mem0: ${formatMem0StatusLabel()}`,
+    `- MCP: ${formatMcpHealthSummary()}`,
     `- Messages processed: ${context.processedMessageCount}`,
   ];
 

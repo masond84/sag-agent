@@ -18,7 +18,8 @@ export type ActivityEventType =
   | "chat_in"
   | "chat_out"
   | "life_message_sent"
-  | "reflection";
+  | "reflection"
+  | "mcp_tool_call";
 
 export interface ActivityEvent {
   at: string;

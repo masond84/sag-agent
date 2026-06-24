@@ -10,3 +10,4 @@ house/.next/
 house/.env.local
 livekit-agent/.venv/
 livekit-agent/.env
+livekit-agent/__pycache__/

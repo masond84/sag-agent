@@ -23,6 +23,8 @@
     "test:dev-task": "tsx src/scripts/test-dev-task.ts",
     "test:speech-policy": "tsx src/scripts/test-speech-policy.ts",
     "test:orchestrator": "tsx src/scripts/test-orchestrator.ts",
+    "test:mcp": "tsx src/scripts/test-mcp.ts",
+    "mcp:gmail-auth": "tsx src/scripts/mcp-gmail-auth.ts",
     "test:telegram": "tsx src/scripts/test-telegram.ts",
     "telegram:chat-id": "tsx src/scripts/telegram-chat-id.ts",
     "auth:gmail": "tsx src/scripts/gmail-auth.ts",
@@ -44,6 +46,7 @@
   "dependencies": {
     "@cursor/sdk": "^1.0.19",
     "@linear/sdk": "^86.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cheerio": "^1.0.0",
     "croner": "^10.0.1",
     "dotenv": "^16.4.7",
