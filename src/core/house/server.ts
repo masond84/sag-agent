@@ -19,6 +19,11 @@ import {
   loadSkillGoals,
 } from "./skill-goals.js";
 import { isDevRunnerEnabled, queueManualDevTask } from "../dev/state.js";
+import {
+  endFaceSession,
+  getFaceSessionConfig,
+  startFaceSession,
+} from "./livekit-session.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 
@@ -186,6 +191,35 @@ async function handleRequest(
       clearInterval(heartbeat);
       unsubscribe();
     });
+    return;
+  }
+
+  if (path === "/face-session/config" && req.method === "GET") {
+    sendJson(res, 200, getFaceSessionConfig());
+    return;
+  }
+
+  if (path === "/face-session" && req.method === "POST") {
+    const raw = await readBody(req);
+    let participantName: string | undefined;
+    try {
+      const parsed = JSON.parse(raw || "{}") as { participantName?: string };
+      participantName = parsed.participantName;
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    const result = await startFaceSession({ participantName });
+    sendJson(res, result.ok ? 200 : 503, result);
+    return;
+  }
+
+  const faceSessionMatch = path.match(/^\/face-session\/([^/]+)$/);
+  if (faceSessionMatch && req.method === "DELETE") {
+    const sessionId = decodeURIComponent(faceSessionMatch[1]!);
+    const result = await endFaceSession(sessionId);
+    sendJson(res, result.ok ? 200 : 400, result);
     return;
   }
 

@@ -8,3 +8,5 @@ data/
 house/node_modules/
 house/.next/
 house/.env.local
+livekit-agent/.venv/
+livekit-agent/.env

@@ -3,7 +3,7 @@ import { getRepoRoot } from "../assistant/repo-tools.js";
 
 const BLOCKED_PATHS = new Set([".env", "data/dev-runner.json", "data/gmail-token.json"]);
 const BLOCKED_PREFIXES = ["data/mem0/", "node_modules/", ".git/"];
-const ALLOWED_PREFIXES = ["src/", "config/", "scripts/", "launchd/", "house/"];
+const ALLOWED_PREFIXES = ["src/", "config/", "scripts/", "launchd/", "house/", "livekit-agent/"];
 const ALLOWED_ROOT_FILES = new Set(["package.json", "tsconfig.json", "README.md", ".env.example"]);
 
 export function normalizeRelativePath(relativePath: string): string {

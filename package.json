@@ -35,6 +35,7 @@
     "house:build": "npm run build --prefix house",
     "house:start": "npm run start --prefix house -- --port 3000",
     "house:restart": "bash scripts/house-restart.sh",
+    "face:agent": "bash scripts/face-agent.sh",
     "sag:refresh": "bash scripts/sag-refresh.sh"
   },
   "engines": {
@@ -48,6 +49,7 @@
     "dotenv": "^16.4.7",
     "googleapis": "^144.0.0",
     "grammy": "^1.44.0",
+    "livekit-server-sdk": "^2.13.0",
     "mem0ai": "^3.0.8",
     "yaml": "^2.7.0"
   },

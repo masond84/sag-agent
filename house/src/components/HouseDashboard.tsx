@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { DevStatusPanel } from "@/components/DevStatusPanel";
-import { FacePanel, speakText } from "@/components/FacePanel";
+import { FacePanel } from "@/components/FacePanel";
+import { speakText, type FaceMode, fetchFaceSessionConfig } from "@/lib/face";
 import { SkillTreeGrid } from "@/components/SkillTreeGrid";
 import type { FaceState, HouseEvent, SkillTreeNode, SkillTreePayload, WorkerHealth } from "@/lib/types";
 import { createWorkerEventSource, fetchSkillTree, fetchWorkerHealth } from "@/lib/worker";
@@ -18,6 +19,11 @@ export function HouseDashboard() {
   const [connected, setConnected] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SkillTreeNode | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [faceMode, setFaceMode] = useState<FaceMode>("presence");
+  const [photorealActive, setPhotorealActive] = useState(false);
+  const [photorealAvailable, setPhotorealAvailable] = useState(false);
+  const [photorealError, setPhotorealError] = useState<string | null>(null);
+  const [reconnectToken, setReconnectToken] = useState(0);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const refreshSkillTree = useCallback(async () => {
@@ -27,7 +33,17 @@ export function HouseDashboard() {
     setLoading(false);
   }, []);
 
+  const requestAvatarReconnect = useCallback(() => {
+    setPhotorealError(null);
+    setReconnectToken((value) => value + 1);
+  }, []);
+
   const enqueueSpeech = useCallback((text: string) => {
+    if (faceMode === "photoreal" && photorealActive) {
+      setCaption(text);
+      return;
+    }
+
     speechQueueRef.current = speechQueueRef.current.then(async () => {
       setCaption(text);
       setFaceState("speaking");
@@ -37,7 +53,7 @@ export function HouseDashboard() {
         () => setFaceState("idle"),
       );
     });
-  }, []);
+  }, [faceMode, photorealActive]);
 
   const handleEvent = useCallback(
     (event: HouseEvent) => {
@@ -58,9 +74,9 @@ export function HouseDashboard() {
     let mounted = true;
 
     async function load() {
-      await refreshSkillTree();
-      if (!mounted) {
-        return;
+      const [config] = await Promise.all([fetchFaceSessionConfig(), refreshSkillTree()]);
+      if (mounted) {
+        setPhotorealAvailable(Boolean(config?.enabled));
       }
     }
 
@@ -101,8 +117,8 @@ export function HouseDashboard() {
             Home Base
           </h1>
           <p className="max-w-lg text-sm leading-relaxed text-sag-muted">
-            Skill constellation, live activity, and Tier 1 presence shell. Photoreal face plugs in
-            later.
+            Skill constellation, live activity, and swappable face — Tier 1 for ambient pings,
+            Tier 3 photoreal for on-demand face-to-face sessions.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -118,6 +134,25 @@ export function HouseDashboard() {
           >
             Test voice
           </button>
+          {photorealAvailable && (
+            <button
+              type="button"
+              onClick={() => {
+                setPhotorealError(null);
+                if (faceMode === "photoreal" && photorealActive) {
+                  setPhotorealActive(false);
+                  setFaceMode("presence");
+                  return;
+                }
+                setFaceMode("photoreal");
+                setPhotorealActive(true);
+                setReconnectToken((value) => value + 1);
+              }}
+              className="rounded-md border border-sag-border bg-white/[0.03] px-4 py-2 text-xs font-medium text-sag-text transition hover:bg-white/[0.06]"
+            >
+              {faceMode === "photoreal" && photorealActive ? "End face-to-face" : "Face-to-face"}
+            </button>
+          )}
         </div>
       </header>
 
@@ -144,7 +179,22 @@ export function HouseDashboard() {
         />
         <aside className="flex flex-col gap-8">
           <DevStatusPanel />
-          <FacePanel caption={caption} state={faceState} />
+          {photorealError && (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+              {photorealError}
+            </p>
+          )}
+          <FacePanel
+            caption={caption}
+            state={faceState}
+            mode={faceMode}
+            photorealActive={photorealActive}
+            photorealAvailable={photorealAvailable}
+            reconnectToken={reconnectToken}
+            onFaceStateChange={setFaceState}
+            onPhotorealError={setPhotorealError}
+            onRequestReconnect={requestAvatarReconnect}
+          />
           <ActivityFeed events={events} />
         </aside>
       </div>

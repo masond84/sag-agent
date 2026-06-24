@@ -1,0 +1,4 @@
+livekit-agents>=1.6.3
+livekit-plugins-openai>=1.6.3
+livekit-plugins-simli>=1.6.3
+python-dotenv>=1.0.0
