@@ -10,7 +10,9 @@ interface RawMcpConfig {
 const ENV_PATTERN = /\$\{([A-Z0-9_]+)\}/g;
 
 function resolveEnvString(value: string): string {
-  return value.replace(ENV_PATTERN, (_match, name: string) => process.env[name] ?? "");
+  return value
+    .replace(/\{ROOT\}/g, process.cwd())
+    .replace(ENV_PATTERN, (_match, name: string) => process.env[name] ?? "");
 }
 
 function resolveEnvRecord(env: Record<string, string> | undefined): Record<string, string> | undefined {

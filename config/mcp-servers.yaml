@@ -4,9 +4,8 @@
 servers:
   gmail:
     enabled: true
-    command: npx
-    args: ["-y", "@gongrzhe/server-gmail-autoauth-mcp@latest"]
-    cwd: data/gmail-mcp
+    command: node
+    args: ["{ROOT}/node_modules/@gongrzhe/server-gmail-autoauth-mcp/dist/index.js"]
     tool_prefix: gmail
     # Read-only to start; remove or expand when send/label tools are trusted.
     allowed_tools:

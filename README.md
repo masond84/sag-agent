@@ -125,7 +125,7 @@ Setup:
 mkdir -p data/gmail-mcp
 cp ~/Downloads/client_secret_*.json data/gmail-mcp/gcp-oauth.keys.json
 
-# 2. One-time MCP auth (browser sign-in)
+# 2. One-time MCP auth (browser sign-in — uses port 3000; stop House UI if running)
 npm run mcp:gmail-auth
 
 # 3. Smoke test
