@@ -34,4 +34,5 @@ export type AvatarConnectionStatus =
 
 export interface LiveKitAvatarHandle {
   speak: (text: string) => void;
+  unlockAudio: () => Promise<void>;
 }

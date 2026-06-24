@@ -8,7 +8,7 @@ LOG="${SAG_ROOT}/data/house-ui.log"
 mkdir -p "${SAG_ROOT}/data"
 
 if lsof -ti:"${PORT}" >/dev/null 2>&1; then
-  kill "$(lsof -ti:"${PORT}")" 2>/dev/null || true
+  kill -9 "$(lsof -ti:"${PORT}")" 2>/dev/null || true
   sleep 1
 fi
 
