@@ -1,4 +1,4 @@
-export { speakTextViaAgent, resolveVoiceAgentIdentity, SAG_SPEAK_RPC_METHOD } from "./agent-speak";
+export { speakTextViaAgent, resolveVoiceAgentIdentity, findVoiceAgentParticipant, isVoiceAgentParticipant, SAG_SPEAK_RPC_METHOD } from "./agent-speak";
 export { speakText } from "./tts";
 export type {
   AvatarConnectionStatus,

@@ -154,7 +154,8 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
     speechQueueRef.current = speechQueueRef.current.then(async () => {
       const room = roomRef.current;
-      if (!room || room.state !== ConnectionState.Connected) {
+      if (!room) {
+        onErrorRef.current?.("Avatar speech failed: face session is not active.");
         return;
       }
 

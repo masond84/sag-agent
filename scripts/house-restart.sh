@@ -16,6 +16,6 @@ cd "${SAG_ROOT}/house"
 echo "" >> "${LOG}"
 echo "==> $(date -u +%Y-%m-%dT%H:%M:%SZ) house-restart" >> "${LOG}"
 npm run build >> "${LOG}" 2>&1
-nohup npm run start -- --port "${PORT}" >> "${LOG}" 2>&1 &
+nohup npm run start >> "${LOG}" 2>&1 &
 
 echo "House UI restarted on http://localhost:${PORT} (log: data/house-ui.log)"
