@@ -24,8 +24,11 @@ import {
   getFaceSessionConfig,
   startFaceSession,
 } from "./livekit-session.js";
+import { buildAssistantReply } from "./assistant-reply.js";
+import type { InteractiveSkillContext } from "../../types.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
+export type HouseInteractiveContextProvider = () => Promise<InteractiveSkillContext>;
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -60,6 +63,7 @@ async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
   getContext: HouseContextProvider,
+  getInteractiveContext?: HouseInteractiveContextProvider,
 ): Promise<void> {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const path = url.pathname;
@@ -223,6 +227,34 @@ async function handleRequest(
     return;
   }
 
+  if (path === "/assistant/reply" && req.method === "POST") {
+    if (!getInteractiveContext) {
+      sendJson(res, 503, { error: "Assistant bridge is not configured" });
+      return;
+    }
+
+    const raw = await readBody(req);
+    let text = "";
+    let chatId: number | string | undefined;
+    try {
+      const parsed = JSON.parse(raw) as { text?: string; chatId?: number | string };
+      text = (parsed.text ?? "").trim();
+      chatId = parsed.chatId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    try {
+      const result = await buildAssistantReply(text, getInteractiveContext, chatId);
+      sendJson(res, 200, result);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
   if (path === "/speech" && req.method === "POST") {
     const raw = await readBody(req);
     let speech = "";
@@ -289,7 +321,10 @@ async function handleRequest(
   sendJson(res, 404, { error: "Not found" });
 }
 
-export function startHouseServer(getContext: HouseContextProvider): void {
+export function startHouseServer(
+  getContext: HouseContextProvider,
+  getInteractiveContext?: HouseInteractiveContextProvider,
+): void {
   if (!isHouseServerEnabled()) {
     return;
   }
@@ -298,7 +333,7 @@ export function startHouseServer(getContext: HouseContextProvider): void {
   const port = getHouseServerPort();
 
   const server = createServer((req, res) => {
-    handleRequest(req, res, getContext).catch((error) => {
+    handleRequest(req, res, getContext, getInteractiveContext).catch((error) => {
       const detail = error instanceof Error ? error.message : String(error);
       console.error("[error] House server:", detail);
       if (!res.headersSent) {

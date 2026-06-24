@@ -66,6 +66,10 @@ export function HouseDashboard() {
       }
 
       if (event.kind === "speech" && event.speech) {
+        if (event.meta?.avatarSpeak === false) {
+          setCaption(event.speech);
+          return;
+        }
         enqueueSpeech(event.speech);
       }
     },

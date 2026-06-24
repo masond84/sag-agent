@@ -8,9 +8,10 @@ import json
 import logging
 import os
 
+import aiohttp
 from dotenv import load_dotenv
 from livekit import rtc
-from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, cli
+from livekit.agents import Agent, AgentSession, JobContext, StopResponse, WorkerOptions, cli, llm
 from livekit.agents import room_io
 from livekit.plugins import openai, simli
 
@@ -40,6 +41,75 @@ def _read_int_env(name: str, default: int) -> int:
         return default
 
 
+def _bridge_enabled() -> bool:
+    return os.getenv("SAG_BRIDGE_ENABLED", "true").lower() != "false"
+
+
+def _worker_url() -> str:
+    return os.getenv("SAG_WORKER_URL", "http://127.0.0.1:9473").rstrip("/")
+
+
+def _telegram_chat_id() -> str:
+    return os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+
+async def _fetch_assistant_reply(text: str) -> tuple[str, str | None]:
+    payload: dict[str, str] = {"text": text}
+    chat_id = _telegram_chat_id()
+    if chat_id:
+        payload["chatId"] = chat_id
+
+    timeout = aiohttp.ClientTimeout(total=120)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(
+            f"{_worker_url()}/assistant/reply",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+        ) as response:
+            body = await response.text()
+            if response.status >= 400:
+                raise RuntimeError(f"worker reply failed ({response.status}): {body[:240]}")
+
+            data = json.loads(body)
+            reply = str(data.get("reply", "")).strip()
+            speakable_raw = data.get("speakable")
+            speakable = str(speakable_raw).strip() if speakable_raw else None
+            return reply, speakable or None
+
+
+class SAGBridgedAgent(Agent):
+    async def on_user_turn_completed(
+        self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
+    ) -> None:
+        if not _bridge_enabled():
+            return
+
+        text = (new_message.text_content or "").strip()
+        if not text:
+            return
+
+        try:
+            reply, speakable = await _fetch_assistant_reply(text)
+        except Exception:
+            logger.exception("Worker assistant bridge failed — falling back to local LLM")
+            return
+
+        spoken = speakable or reply[:320].strip()
+        if not spoken:
+            raise StopResponse()
+
+        logger.info("Bridged user turn to worker (%d chars in, %d spoken)", len(text), len(spoken))
+
+        chat_ctx = self.chat_ctx.copy()
+        chat_ctx.items.append(new_message)
+        chat_ctx.items.append(llm.ChatMessage(role="assistant", content=[spoken]))
+        await self.update_chat_ctx(chat_ctx)
+
+        handle = self.session.say(spoken, allow_interruptions=True, add_to_chat_ctx=False)
+        await handle.wait_for_playout()
+        raise StopResponse()
+
+
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
 
@@ -54,7 +124,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
     await session.start(
         room=ctx.room,
-        agent=Agent(instructions=SAG_INSTRUCTIONS),
+        agent=SAGBridgedAgent(instructions=SAG_INSTRUCTIONS),
         room_input_options=room_io.RoomInputOptions(close_on_disconnect=False),
     )
 
@@ -75,6 +145,11 @@ async def entrypoint(ctx: JobContext) -> None:
 
     ctx.room.local_participant.register_rpc_method(SAG_SPEAK_RPC_METHOD, handle_sag_speak)
     logger.info("Registered RPC method %s", SAG_SPEAK_RPC_METHOD)
+
+    if _bridge_enabled():
+        logger.info("Assistant bridge enabled — worker at %s", _worker_url())
+    else:
+        logger.info("Assistant bridge disabled — using local LLM only")
 
     if simli_key and simli_face:
         max_idle = _read_int_env("SIMLI_MAX_IDLE_TIME", 300)
