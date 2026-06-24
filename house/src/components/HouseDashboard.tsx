@@ -100,6 +100,7 @@ export function HouseDashboard() {
 
   async function testSpeech() {
     const sample = "Hey Devin. House is online. Skill tree loaded and I'm ready to evolve.";
+    await avatarSpeakRef.current?.unlockAudio();
     enqueueSpeech(sample);
     await fetch("/api/worker/speech", {
       method: "POST",
@@ -146,6 +147,7 @@ export function HouseDashboard() {
                   setFaceMode("presence");
                   return;
                 }
+                void avatarSpeakRef.current?.unlockAudio();
                 setFaceMode("photoreal");
                 setPhotorealActive(true);
                 setReconnectToken((value) => value + 1);

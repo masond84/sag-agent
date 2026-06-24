@@ -8,6 +8,7 @@ import {
   Track,
   type RemoteTrack,
   type RemoteTrackPublication,
+  type RemoteParticipant,
 } from "livekit-client";
 import { isAvatarVideoParticipant, speakTextViaAgent } from "@/lib/face/agent-speak";
 import type { AvatarConnectionStatus, FaceRendererProps, LiveKitAvatarHandle } from "@/lib/face/types";
@@ -45,7 +46,9 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     ref,
   ) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const roomRef = useRef<Room | null>(null);
+  const pendingAudioUnlockRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
   const connectGenerationRef = useRef(0);
   const autoReconnectCountRef = useRef(0);
@@ -64,6 +67,36 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [avatarStatus, setAvatarStatus] = useState<AvatarConnectionStatus>("off");
+  const [audioBlocked, setAudioBlocked] = useState(false);
+
+  const unlockRoomAudio = useCallback(async () => {
+    pendingAudioUnlockRef.current = true;
+    const room = roomRef.current;
+    if (!room || room.state !== ConnectionState.Connected) {
+      return;
+    }
+
+    try {
+      await room.startAudio();
+      setAudioBlocked(false);
+      pendingAudioUnlockRef.current = false;
+    } catch {
+      setAudioBlocked(true);
+    }
+  }, []);
+
+  const tryUnlockAfterConnect = useCallback(async (room: Room) => {
+    if (!pendingAudioUnlockRef.current) {
+      return;
+    }
+    try {
+      await room.startAudio();
+      setAudioBlocked(false);
+      pendingAudioUnlockRef.current = false;
+    } catch {
+      setAudioBlocked(!room.canPlaybackAudio);
+    }
+  }, []);
 
   const setStatus = useCallback((status: AvatarConnectionStatus) => {
     setAvatarStatus(status);
@@ -92,9 +125,71 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     track.attach(element);
     element.muted = false;
     void element.play().catch(() => {
-      // autoplay may require user gesture
+      setAudioBlocked(true);
     });
   }, []);
+
+  const attachAudioTrack = useCallback(async (track: RemoteTrack) => {
+    if (track.kind !== Track.Kind.Audio) {
+      return;
+    }
+
+    const room = roomRef.current;
+    if (room) {
+      try {
+        await room.startAudio();
+      } catch {
+        setAudioBlocked(true);
+      }
+    }
+
+    const element = audioRef.current;
+    if (element) {
+      track.attach(element);
+      element.muted = false;
+      void element.play().catch(() => {
+        setAudioBlocked(true);
+      });
+      setAudioBlocked(false);
+      return;
+    }
+
+    track.attach();
+    setAudioBlocked(false);
+  }, []);
+
+  const syncRemoteAvatarTracks = useCallback((room: Room) => {
+    for (const participant of room.remoteParticipants.values()) {
+      if (!isAvatarVideoParticipant(participant.identity)) {
+        continue;
+      }
+      for (const publication of participant.trackPublications.values()) {
+        const track = publication.track;
+        if (!track || track.kind === Track.Kind.Video) {
+          if (track?.kind === Track.Kind.Video) {
+            attachVideoTrack(track as RemoteTrack);
+          }
+          continue;
+        }
+        if (track.kind === Track.Kind.Audio) {
+          void attachAudioTrack(track as RemoteTrack);
+        }
+      }
+    }
+  }, [attachAudioTrack, attachVideoTrack]);
+
+  const attachAvatarTrack = useCallback((track: RemoteTrack, participant: RemoteParticipant) => {
+    if (!isAvatarVideoParticipant(participant.identity)) {
+      return;
+    }
+    if (track.kind === Track.Kind.Video) {
+      attachVideoTrack(track);
+      return;
+    }
+    if (track.kind === Track.Kind.Audio) {
+      void attachAudioTrack(track);
+    }
+  }, [attachAudioTrack, attachVideoTrack]);
 
   const scheduleAutoReconnect = useCallback(() => {
     if (!sessionActive) {
@@ -173,7 +268,11 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
   useImperativeHandle(ref, () => ({
     speak: enqueueAgentSpeech,
-  }), [enqueueAgentSpeech]);
+    unlockAudio: async () => {
+      pendingAudioUnlockRef.current = true;
+      await unlockRoomAudio();
+    },
+  }), [enqueueAgentSpeech, unlockRoomAudio]);
 
   useEffect(() => {
     if (!sessionActive) {
@@ -249,21 +348,36 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
           setStatus("live");
           onStateChangeRef.current?.("idle");
         }
-        attachVideoTrack(track);
+        attachAvatarTrack(track, participant);
+      });
+
+      room.on(RoomEvent.TrackPublished, (publication, participant) => {
+        if (!isAvatarVideoParticipant(participant.identity)) {
+          return;
+        }
+        if (publication.kind === Track.Kind.Audio && !publication.isSubscribed) {
+          publication.setSubscribed(true);
+        }
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
-        if (track.kind === Track.Kind.Video) {
-          track.detach();
-          if (isAvatarVideoParticipant(participant.identity)) {
-            handleAvatarLost();
-          }
+        track.detach();
+        if (track.kind === Track.Kind.Video && isAvatarVideoParticipant(participant.identity)) {
+          handleAvatarLost();
+        }
+      });
+
+      room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+        const room = roomRef.current;
+        if (room) {
+          setAudioBlocked(!room.canPlaybackAudio);
         }
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
         if (isAvatarVideoParticipant(participant.identity)) {
           syncAvatarPresence();
+          syncRemoteAvatarTracks(room);
         }
       });
 
@@ -283,6 +397,9 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
           return;
         }
         await room.localParticipant.setMicrophoneEnabled(true);
+        await tryUnlockAfterConnect(room);
+        syncRemoteAvatarTracks(room);
+        setAudioBlocked(!room.canPlaybackAudio);
         syncAvatarPresence();
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
@@ -325,16 +442,27 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
   return (
     <div className="flex w-full max-w-sm flex-col items-center gap-4">
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-sag-border bg-black/40 shadow-soft">
+      <div
+        className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-sag-border bg-black/40 shadow-soft"
+        onPointerDown={() => {
+          void unlockRoomAudio();
+        }}
+      >
         <video
           ref={videoRef}
           className="h-full w-full object-cover"
           playsInline
           autoPlay
         />
+        <audio ref={audioRef} autoPlay playsInline style={{ position: "absolute", width: 0, height: 0, opacity: 0 }} />
         {overlayMessage && sessionActive && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-6 text-center text-sm text-sag-muted">
             {overlayMessage}
+          </div>
+        )}
+        {audioBlocked && sessionActive && avatarStatus === "live" && !overlayMessage && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/70 px-4 py-2 text-center text-xs text-amber-100/90">
+            Tap the face or Test voice to enable sound
           </div>
         )}
       </div>
