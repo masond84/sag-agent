@@ -2,11 +2,11 @@ import "dotenv/config";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { getRepoRoot } from "../core/assistant/repo-tools.js";
+import { isDevRunnerEnabled } from "../core/dev/state.js";
 import {
   checkOrchestratorEnv,
   getGithubRepo,
   getOrchestratorMode,
-  isDevOrchestratorEnabled,
 } from "../core/orchestrator/config.js";
 import { pingCursor } from "../core/orchestrator/cursor-cloud.js";
 import { pingLinear } from "../core/orchestrator/linear-client.js";
@@ -26,7 +26,7 @@ async function main(): Promise<void> {
   const lines = [
     "SAG orchestrator preflight",
     "",
-    `- DEV_RUNNER_ENABLED: ${isDevOrchestratorEnabled()}`,
+    `- DEV_RUNNER_ENABLED: ${isDevRunnerEnabled()}`,
     `- DEV_ORCHESTRATOR_MODE: ${getOrchestratorMode()}`,
     `- GITHUB_REPO: ${getGithubRepo()}`,
     `- Repo root: ${getRepoRoot()}`,

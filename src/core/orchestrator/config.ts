@@ -1,3 +1,5 @@
+import { isDevRunnerEnabled } from "../dev/state.js";
+
 export type OrchestratorMode = "local" | "cursor";
 
 const GUARDRAIL_ALLOW = ["src/", "config/", "scripts/", "house/", "README.md", ".env.example"];
@@ -9,11 +11,7 @@ export function getOrchestratorMode(): OrchestratorMode {
 }
 
 export function isCursorOrchestratorMode(): boolean {
-  return isDevOrchestratorEnabled() && getOrchestratorMode() === "cursor";
-}
-
-export function isDevOrchestratorEnabled(): boolean {
-  return (process.env.DEV_RUNNER_ENABLED ?? "false").toLowerCase() === "true";
+  return isDevRunnerEnabled() && getOrchestratorMode() === "cursor";
 }
 
 export function isAutoMergeEnabled(): boolean {
