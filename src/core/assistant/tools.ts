@@ -81,9 +81,6 @@ export const nativeAssistantTools: ToolDefinition[] = [
   },
 ];
 
-/** @deprecated Use getAllAssistantTools() — includes MCP connector tools when enabled. */
-export const assistantTools = nativeAssistantTools;
-
 export function getAllAssistantTools(): ToolDefinition[] {
   return [...nativeAssistantTools, ...getMcpToolDefinitions()];
 }
