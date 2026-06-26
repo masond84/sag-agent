@@ -71,6 +71,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | Command | Description |
 |---------|-------------|
 | `npm run test:conservice` | Parse Conservice bill fixture (no secrets required) |
+| `npm run auth:gmail` | One-time OAuth for worker Gmail polling (Conservice bills); paste `GMAIL_REFRESH_TOKEN` into `.env` |
 | `npm run dev` | Run worker with hot reload |
 | `npm run worker:once` | Single schedule + email cycle |
 | `npm run test:telegram` | Test Telegram send |
@@ -116,7 +117,7 @@ Open http://localhost:3000. See `house/README.md` for API routes and Vercel depl
 
 SAG can attach external **Model Context Protocol** servers as assistant tools (stdio child processes). Connectors are declared in `config/mcp-servers.yaml` — no TypeScript changes needed to add another server.
 
-**Gmail (first connector):** `@gongrzhe/server-gmail-autoauth-mcp` exposes search/read/label tools to Telegram and House voice. Conservice bill polling is unchanged (scheduled skill).
+**Gmail (first connector):** `@gongrzhe/server-gmail-autoauth-mcp` exposes search/read/label tools to Telegram and House voice. Conservice bill polling uses a separate OAuth flow (`npm run auth:gmail` + `GMAIL_*` in `.env`); MCP auth does not configure the worker poll.
 
 Setup:
 
