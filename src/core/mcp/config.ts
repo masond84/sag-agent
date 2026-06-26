@@ -61,9 +61,9 @@ export async function loadMcpServerConfigs(): Promise<McpServerConfig[]> {
     configs.push({
       id,
       enabled: true,
-      command: server.command,
-      args: server.args ?? [],
-      cwd: server.cwd ? path.resolve(process.cwd(), server.cwd) : undefined,
+      command: resolveEnvString(server.command),
+      args: (server.args ?? []).map((arg) => resolveEnvString(arg)),
+      cwd: server.cwd ? path.resolve(process.cwd(), resolveEnvString(server.cwd)) : undefined,
       env: resolveEnvRecord(server.env),
       tool_prefix: server.tool_prefix?.trim() || id,
       allowed_tools: server.allowed_tools,
