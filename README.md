@@ -57,6 +57,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram bot + authorized chat |
 | `OPENAI_API_KEY` | Assistant + companion LLM replies |
 | `POLL_INTERVAL_MS` | Gmail poll interval (not chat) |
+| `PROCESSED_MESSAGE_ID_LIMIT` | Max Gmail message IDs kept in `data/processed-messages.json` (default 1000) |
 | `SCHEDULE_CRON` | Cron pattern for scheduled skills (default every minute) |
 | `DRY_RUN` | `true` = suppress Telegram for email bills and routine scheduled reports (e.g. heartbeat); companion briefings (morning, focus, life) bypass dry-run and still send |
 | `DEV_RUNNER_ENABLED` | `true` = autonomous code/PR loop (requires `gh auth`) |
@@ -78,6 +79,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:focus` | Preview focus companion messages |
 | `npm run test:life` | Preview life companion slots and sample message |
 | `npm run test:activity` | Smoke-test activity log |
+| `npm run test:state` | Smoke-test processed-message state retention cap |
 | `npm run test:reflection` | List agent Mem0; optional `--seed=` |
 | `npm run test:memory` | User Mem0 smoke test |
 | `npm run test:dev` | Dev runner status |
