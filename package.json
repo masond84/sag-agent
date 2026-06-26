@@ -17,6 +17,7 @@
     "test:life": "tsx src/scripts/test-life-companion.ts",
     "test:memory": "tsx src/scripts/test-memory.ts",
     "test:activity": "tsx src/scripts/test-activity-log.ts",
+    "test:state": "tsx src/scripts/test-state.ts",
     "test:reflection": "tsx src/scripts/test-reflection.ts",
     "test:purge-agent-memories": "tsx src/scripts/test-purge-agent-memories.ts",
     "test:dev": "tsx src/scripts/test-dev.ts",
