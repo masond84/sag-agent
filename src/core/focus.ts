@@ -91,11 +91,6 @@ export async function setTodayFocus(text: string, timeZone = getTimeZone()): Pro
   }, timeZone);
 }
 
-export async function hasTodayFocus(timeZone = getTimeZone()): Promise<boolean> {
-  const day = await getTodayFocusDay(timeZone);
-  return Boolean(day.focus?.trim());
-}
-
 export async function getTodayFocusText(timeZone = getTimeZone()): Promise<string | undefined> {
   const day = await getTodayFocusDay(timeZone);
   return day.focus?.trim() || undefined;
