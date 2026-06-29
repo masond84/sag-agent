@@ -54,19 +54,26 @@ export async function PATCH(
   return proxyWorkerRequest(request, context, "PATCH");
 }
 
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ path: string[] }> },
+): Promise<Response> {
+  return proxyWorkerRequest(request, context, "DELETE");
+}
+
 async function proxyWorkerRequest(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "DELETE",
 ): Promise<Response> {
   const { path } = await context.params;
   const suffix = path.join("/");
   const target = `${getWorkerBaseUrl()}/${suffix}`;
-  const body = await request.text();
+  const body = method === "DELETE" ? undefined : await request.text();
 
   const upstream = await fetch(target, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: method === "DELETE" ? undefined : { "Content-Type": "application/json" },
     body,
     cache: "no-store",
   });
