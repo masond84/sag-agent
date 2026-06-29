@@ -18,34 +18,6 @@ export function isAuthorizedChat(chatId: number | string): boolean {
   return String(chatId) === authorized;
 }
 
-export async function sendTelegramMessage(chatId: number | string, text: string): Promise<void> {
-  const token = getBotToken();
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Telegram send failed (${response.status}): ${errorBody}`);
-  }
-}
-
-export function parseCommand(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed.startsWith("/")) {
-    return null;
-  }
-
-  const command = trimmed.split(/\s+/)[0]?.toLowerCase() ?? "";
-  const base = command.split("@")[0];
-  return base || null;
-}
-
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 
 export function splitTelegramMessage(text: string, maxLength = TELEGRAM_MAX_MESSAGE_LENGTH): string[] {
@@ -71,4 +43,42 @@ export function splitTelegramMessage(text: string, maxLength = TELEGRAM_MAX_MESS
   }
 
   return chunks;
+}
+
+async function postTelegramMessage(
+  token: string,
+  chatId: number | string,
+  text: string,
+): Promise<void> {
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Telegram send failed (${response.status}): ${errorBody}`);
+  }
+}
+
+export async function sendTelegramMessage(chatId: number | string, text: string): Promise<void> {
+  const token = getBotToken();
+  for (const chunk of splitTelegramMessage(text)) {
+    await postTelegramMessage(token, chatId, chunk);
+  }
+}
+
+export function parseCommand(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("/")) {
+    return null;
+  }
+
+  const command = trimmed.split(/\s+/)[0]?.toLowerCase() ?? "";
+  const base = command.split("@")[0];
+  return base || null;
 }
