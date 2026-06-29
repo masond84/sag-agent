@@ -14,13 +14,39 @@ function getResultMaxChars(): number {
   return Number.isFinite(parsed) && parsed > 500 ? parsed : 8000;
 }
 
+function extractMcpContentText(result: unknown): string | null {
+  if (!result || typeof result !== "object") {
+    return null;
+  }
+
+  const content = (result as { content?: unknown }).content;
+  if (!Array.isArray(content)) {
+    return null;
+  }
+
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+
+    const typed = block as { type?: string; text?: string };
+    if (typed.type === "text" && typeof typed.text === "string" && typed.text.trim()) {
+      parts.push(typed.text.trim());
+    }
+  }
+
+  return parts.length > 0 ? parts.join("\n\n") : null;
+}
+
 function formatToolResult(result: unknown): string {
   let text: string;
 
   if (typeof result === "string") {
     text = result;
   } else {
-    text = JSON.stringify(result, null, 2);
+    const extracted = extractMcpContentText(result);
+    text = extracted ?? JSON.stringify(result, null, 2);
   }
 
   const maxChars = getResultMaxChars();
@@ -99,7 +125,11 @@ export async function executeMcpTool(name: string, argsJson: string): Promise<st
 
   let args: Record<string, unknown> = {};
   if (argsJson.trim()) {
-    args = JSON.parse(argsJson) as Record<string, unknown>;
+    try {
+      args = JSON.parse(argsJson) as Record<string, unknown>;
+    } catch {
+      return `Invalid MCP tool arguments (expected JSON): ${argsJson.slice(0, 200)}`;
+    }
   }
 
   try {
