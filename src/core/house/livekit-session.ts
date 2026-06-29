@@ -64,6 +64,8 @@ export async function startFaceSession(
     };
   }
 
+  await endAllFaceSessions();
+
   const sessionId = createSessionId();
   const roomName = createRoomName(sessionId);
   const participantIdentity = `sag-user-${sessionId}`;
@@ -89,7 +91,7 @@ export async function startFaceSession(
   token.addGrant({
     roomJoin: true,
     room: roomName,
-    canPublish: true,
+    canPublish: false,
     canSubscribe: true,
     canPublishData: true,
   });
@@ -145,4 +147,11 @@ export async function endFaceSession(sessionId: string): Promise<{ ok: boolean; 
 
   activeSessions.delete(sessionId);
   return { ok: true };
+}
+
+export async function endAllFaceSessions(): Promise<void> {
+  const sessionIds = [...activeSessions.keys()];
+  for (const sessionId of sessionIds) {
+    await endFaceSession(sessionId);
+  }
 }
