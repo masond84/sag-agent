@@ -45,6 +45,10 @@ def _bridge_enabled() -> bool:
     return os.getenv("SAG_BRIDGE_ENABLED", "true").lower() != "false"
 
 
+def _voice_input_enabled() -> bool:
+    return os.getenv("SAG_VOICE_INPUT_ENABLED", "false").lower() == "true"
+
+
 def _worker_url() -> str:
     return os.getenv("SAG_WORKER_URL", "http://127.0.0.1:9473").rstrip("/")
 
@@ -115,17 +119,31 @@ async def entrypoint(ctx: JobContext) -> None:
 
     simli_key = os.getenv("SIMLI_API_KEY", "").strip()
     simli_face = os.getenv("SIMLI_FACE_ID", "").strip()
+    voice_input = _voice_input_enabled()
 
-    session = AgentSession(
-        stt=openai.STT(),
-        llm=openai.LLM(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini")),
-        tts=openai.TTS(voice=os.getenv("OPENAI_TTS_VOICE", "nova")),
-    )
+    if voice_input:
+        session = AgentSession(
+            stt=openai.STT(),
+            llm=openai.LLM(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini")),
+            tts=openai.TTS(voice=os.getenv("OPENAI_TTS_VOICE", "nova")),
+        )
+        agent = SAGBridgedAgent(instructions=SAG_INSTRUCTIONS)
+    else:
+        session = AgentSession(
+            tts=openai.TTS(voice=os.getenv("OPENAI_TTS_VOICE", "nova")),
+        )
+        agent = Agent(
+            instructions="Output-only SAG avatar. Speak only when text is injected via sag.speak.",
+        )
 
     await session.start(
         room=ctx.room,
-        agent=SAGBridgedAgent(instructions=SAG_INSTRUCTIONS),
-        room_input_options=room_io.RoomInputOptions(close_on_disconnect=False),
+        agent=agent,
+        room_input_options=room_io.RoomInputOptions(
+            audio_enabled=voice_input,
+            text_enabled=voice_input,
+            close_on_disconnect=False,
+        ),
     )
 
     async def handle_sag_speak(data: rtc.RpcInvocationData) -> str:
@@ -146,14 +164,17 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.local_participant.register_rpc_method(SAG_SPEAK_RPC_METHOD, handle_sag_speak)
     logger.info("Registered RPC method %s", SAG_SPEAK_RPC_METHOD)
 
-    if _bridge_enabled():
-        logger.info("Assistant bridge enabled — worker at %s", _worker_url())
+    if voice_input:
+        if _bridge_enabled():
+            logger.info("Voice input enabled — assistant bridge at %s", _worker_url())
+        else:
+            logger.info("Voice input enabled — using local LLM only")
     else:
-        logger.info("Assistant bridge disabled — using local LLM only")
+        logger.info("Voice input disabled — avatar speaks via sag.speak only (e.g. Telegram → House)")
 
     if simli_key and simli_face:
-        max_idle = _read_int_env("SIMLI_MAX_IDLE_TIME", 300)
-        max_session = _read_int_env("SIMLI_MAX_SESSION_LENGTH", 1800)
+        max_idle = _read_int_env("SIMLI_MAX_IDLE_TIME", 1800)
+        max_session = _read_int_env("SIMLI_MAX_SESSION_LENGTH", 7200)
         avatar = simli.AvatarSession(
             simli_config=simli.SimliConfig(
                 api_key=simli_key,
@@ -172,9 +193,10 @@ async def entrypoint(ctx: JobContext) -> None:
     else:
         logger.warning("SIMLI_API_KEY or SIMLI_FACE_ID missing — voice-only session in room")
 
-    await session.generate_reply(
-        instructions="Greet Devin briefly — one short sentence. You're live on the House face-to-face screen.",
-    )
+    if voice_input:
+        await session.generate_reply(
+            instructions="Greet Devin briefly — one short sentence. You're live on the House face-to-face screen.",
+        )
 
 
 if __name__ == "__main__":
@@ -183,5 +205,6 @@ if __name__ == "__main__":
         WorkerOptions(
             entrypoint_fnc=entrypoint,
             agent_name=agent_name,
+            num_idle_processes=1,
         ),
     )

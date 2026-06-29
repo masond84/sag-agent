@@ -25,6 +25,7 @@
     "test:speech-policy": "tsx src/scripts/test-speech-policy.ts",
     "test:orchestrator": "tsx src/scripts/test-orchestrator.ts",
     "test:mcp": "tsx src/scripts/test-mcp.ts",
+    "mcp:setup": "tsx src/scripts/mcp-setup.ts",
     "mcp:gmail-auth": "tsx src/scripts/mcp-gmail-auth.ts",
     "test:telegram": "tsx src/scripts/test-telegram.ts",
     "telegram:chat-id": "tsx src/scripts/telegram-chat-id.ts",
@@ -38,7 +39,7 @@
     "house:build": "npm run build --prefix house",
     "house:start": "npm run start --prefix house -- --port 3000",
     "house:restart": "bash scripts/house-restart.sh",
-    "face:agent": "bash scripts/face-agent.sh",
+    "face:agent": "tsx src/scripts/face-agent.ts",
     "sag:refresh": "bash scripts/sag-refresh.sh"
   },
   "engines": {
