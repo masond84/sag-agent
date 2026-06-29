@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 import { assertGmailMcpInstalled } from "../core/mcp/gmail-mcp-path.js";
+import { ensureGmailMcpOAuthKeysFile, getGmailMcpKeysPath } from "../core/mcp/gmail-oauth-keys.js";
 
 const MCP_DIR = path.resolve(process.cwd(), "data/gmail-mcp");
 const GMAIL_MCP_HOME = path.join(os.homedir(), ".gmail-mcp");
@@ -13,9 +14,18 @@ async function main(): Promise<void> {
   await mkdir(GMAIL_MCP_HOME, { recursive: true });
   const entry = await assertGmailMcpInstalled();
 
-  const keysPath = path.join(MCP_DIR, "gcp-oauth.keys.json");
+  const keysResult = await ensureGmailMcpOAuthKeysFile();
+  if (keysResult === "missing") {
+    console.error(
+      "Missing gcp-oauth.keys.json. Copy your Google OAuth client JSON to data/gmail-mcp/gcp-oauth.keys.json",
+    );
+    console.error("Or set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in .env and re-run.");
+    process.exit(1);
+  }
+
+  const keysPath = getGmailMcpKeysPath();
   console.log(`Gmail MCP auth directory: ${MCP_DIR}`);
-  console.log(`OAuth keys file: ${keysPath}`);
+  console.log(`OAuth keys file: ${keysPath}${keysResult === "created" ? " (created from .env)" : ""}`);
   console.log("");
   console.log("If port 3000 is in use (e.g. SAG House), stop that process first — Gmail MCP auth listens on :3000.");
   console.log("Complete the browser sign-in when prompted.\n");

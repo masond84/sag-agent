@@ -342,6 +342,16 @@ export function startHouseServer(
     });
   });
 
+  server.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.warn(
+        `[warn] House server port ${port} already in use — another worker may be running. Chat/Telegram will continue without house API on this process.`,
+      );
+      return;
+    }
+    console.error(`[error] House server failed to start: ${error.message}`);
+  });
+
   server.listen(port, host, () => {
     console.log(`[info] SAG house server listening on http://${host}:${port}`);
   });
