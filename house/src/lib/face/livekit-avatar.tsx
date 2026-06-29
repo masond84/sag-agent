@@ -17,7 +17,8 @@ import { endFaceSession, fetchFaceSessionConfig, startFaceSession } from "@/lib/
 import { stripMarkdownForSpeech } from "@/lib/worker";
 
 const AUTO_RECONNECT_DELAY_MS = 4_000;
-const MAX_AUTO_RECONNECTS = 2;
+const AVATAR_LOSS_GRACE_MS = 8_000;
+const MAX_AUTO_RECONNECTS = 12;
 
 function roomHasAvatar(room: Room): boolean {
   return [...room.remoteParticipants.values()].some((p) => isAvatarVideoParticipant(p.identity));
@@ -53,6 +54,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
   const connectGenerationRef = useRef(0);
   const autoReconnectCountRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const avatarLossTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const onStateChangeRef = useRef(onStateChange);
@@ -107,6 +109,13 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const clearAvatarLossTimer = useCallback(() => {
+    if (avatarLossTimerRef.current) {
+      clearTimeout(avatarLossTimerRef.current);
+      avatarLossTimerRef.current = null;
     }
   }, []);
 
@@ -191,6 +200,27 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     }
   }, [attachAudioTrack, attachVideoTrack]);
 
+  const teardownCurrentSession = useCallback(async () => {
+    clearReconnectTimer();
+    clearAvatarLossTimer();
+
+    const room = roomRef.current;
+    roomRef.current = null;
+
+    if (room) {
+      room.removeAllListeners();
+      await room.disconnect();
+    }
+
+    const sessionId = sessionIdRef.current;
+    sessionIdRef.current = null;
+    if (sessionId) {
+      await endFaceSession(sessionId);
+    }
+
+    detachVideo();
+  }, [clearAvatarLossTimer, clearReconnectTimer, detachVideo]);
+
   const scheduleAutoReconnect = useCallback(() => {
     if (!sessionActive) {
       return;
@@ -208,38 +238,48 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     }, AUTO_RECONNECT_DELAY_MS);
   }, [clearReconnectTimer, sessionActive, setStatus]);
 
-  const handleAvatarLost = useCallback(() => {
-    detachVideo();
-    if (sessionActive && connectionState === ConnectionState.Connected) {
-      scheduleAutoReconnect();
-    } else {
-      setStatus("lost");
+  const scheduleAvatarLossCheck = useCallback(() => {
+    if (!sessionActive) {
+      return;
     }
-  }, [connectionState, detachVideo, scheduleAutoReconnect, sessionActive, setStatus]);
+
+    clearAvatarLossTimer();
+    setStatus((current) => (current === "live" ? "waiting" : current));
+
+    avatarLossTimerRef.current = setTimeout(() => {
+      const room = roomRef.current;
+      if (!room || room.state !== ConnectionState.Connected) {
+        detachVideo();
+        scheduleAutoReconnect();
+        return;
+      }
+
+      if (roomHasAvatar(room)) {
+        syncRemoteAvatarTracks(room);
+        autoReconnectCountRef.current = 0;
+        setStatus("live");
+        return;
+      }
+
+      detachVideo();
+      scheduleAutoReconnect();
+    }, AVATAR_LOSS_GRACE_MS);
+  }, [
+    clearAvatarLossTimer,
+    detachVideo,
+    scheduleAutoReconnect,
+    sessionActive,
+    setStatus,
+    syncRemoteAvatarTracks,
+  ]);
 
   const disconnect = useCallback(async () => {
-    clearReconnectTimer();
     connectGenerationRef.current += 1;
-
-    const room = roomRef.current;
-    roomRef.current = null;
-
-    if (room) {
-      room.removeAllListeners();
-      await room.disconnect();
-    }
-
-    const sessionId = sessionIdRef.current;
-    sessionIdRef.current = null;
-    if (sessionId) {
-      await endFaceSession(sessionId);
-    }
-
-    detachVideo();
+    await teardownCurrentSession();
     setConnectionState(ConnectionState.Disconnected);
     setStatus("off");
     onStateChangeRef.current?.("idle");
-  }, [clearReconnectTimer, detachVideo, setStatus]);
+  }, [setStatus, teardownCurrentSession]);
 
   const enqueueAgentSpeech = useCallback((text: string) => {
     const cleaned = stripMarkdownForSpeech(text);
@@ -261,7 +301,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         const detail = error instanceof Error ? error.message : String(error);
         onErrorRef.current?.(`Avatar speech failed: ${detail}`);
       } finally {
-        onStateChangeRef.current?.("listening");
+        onStateChangeRef.current?.("idle");
       }
     });
   }, []);
@@ -289,6 +329,15 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     let cancelled = false;
 
     async function connect() {
+      if (cancelled || generation !== connectGenerationRef.current) {
+        return;
+      }
+
+      await teardownCurrentSession();
+      if (cancelled || generation !== connectGenerationRef.current) {
+        return;
+      }
+
       const config = await fetchFaceSessionConfig();
       if (!config?.enabled) {
         onErrorRef.current?.("Photoreal sessions are not configured on the worker.");
@@ -321,6 +370,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         if (roomHasAvatar(room)) {
           autoReconnectCountRef.current = 0;
           clearReconnectTimer();
+          clearAvatarLossTimer();
           setStatus("live");
           return;
         }
@@ -330,13 +380,15 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       room.on(RoomEvent.ConnectionStateChanged, (state) => {
         setConnectionState(state);
         if (state === ConnectionState.Connected) {
-          onStateChangeRef.current?.("listening");
+          onStateChangeRef.current?.("idle");
           syncAvatarPresence();
         }
         if (state === ConnectionState.Disconnected) {
           onStateChangeRef.current?.("idle");
+          clearAvatarLossTimer();
           if (sessionActive && generation === connectGenerationRef.current) {
-            handleAvatarLost();
+            detachVideo();
+            scheduleAutoReconnect();
           }
         }
       });
@@ -345,6 +397,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         if (isAvatarVideoParticipant(participant.identity) && track.kind === Track.Kind.Video) {
           autoReconnectCountRef.current = 0;
           clearReconnectTimer();
+          clearAvatarLossTimer();
           setStatus("live");
           onStateChangeRef.current?.("idle");
         }
@@ -363,7 +416,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       room.on(RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
         track.detach();
         if (track.kind === Track.Kind.Video && isAvatarVideoParticipant(participant.identity)) {
-          handleAvatarLost();
+          scheduleAvatarLossCheck();
         }
       });
 
@@ -376,6 +429,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
         if (isAvatarVideoParticipant(participant.identity)) {
+          clearAvatarLossTimer();
           syncAvatarPresence();
           syncRemoteAvatarTracks(room);
         }
@@ -383,7 +437,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         if (isAvatarVideoParticipant(participant.identity)) {
-          handleAvatarLost();
+          scheduleAvatarLossCheck();
           return;
         }
         syncAvatarPresence();
@@ -396,7 +450,6 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
           await endFaceSession(session.sessionId);
           return;
         }
-        await room.localParticipant.setMicrophoneEnabled(true);
         await tryUnlockAfterConnect(room);
         syncRemoteAvatarTracks(room);
         setAudioBlocked(!room.canPlaybackAudio);
@@ -414,7 +467,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     return () => {
       cancelled = true;
       clearReconnectTimer();
-      void disconnect();
+      clearAvatarLossTimer();
     };
     // reconnectToken intentionally triggers a fresh room when user/auto reconnects
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -467,7 +520,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         )}
       </div>
       <p className="min-h-[3rem] max-w-[280px] text-center text-sm leading-relaxed text-sag-muted">
-        {caption || "Speak in the room, or let Telegram messages play through the avatar."}
+        {caption || "Telegram and House activity play through the avatar. Mic input is off."}
       </p>
       <span className="rounded-md border border-sag-border bg-white/[0.03] px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-sag-muted">
         {statusLabel[avatarStatus]}
