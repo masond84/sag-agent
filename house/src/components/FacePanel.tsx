@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PresenceExpandButton } from "@/components/PresenceExpandButton";
 import {
   LiveKitAvatarRenderer,
   PixelHouseRenderer,
@@ -18,6 +19,8 @@ interface FacePanelProps {
   photorealActive: boolean;
   photorealAvailable: boolean;
   reconnectToken: number;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
   avatarSpeakRef?: React.RefObject<LiveKitAvatarHandle | null>;
   onFaceStateChange?: (state: FaceState) => void;
   onPhotorealError?: (message: string) => void;
@@ -32,6 +35,8 @@ export function FacePanel({
   photorealActive,
   photorealAvailable,
   reconnectToken,
+  expanded = false,
+  onToggleExpand,
   avatarSpeakRef,
   onFaceStateChange,
   onPhotorealError,
@@ -50,7 +55,7 @@ export function FacePanel({
 
     let tick = 0;
     const animate = () => {
-      tick += 0.15;
+      tick += expanded ? 0.2 : 0.15;
       setAmplitude(0.25 + Math.abs(Math.sin(tick)) * 0.55 + Math.random() * 0.1);
       rafRef.current = requestAnimationFrame(animate);
     };
@@ -60,7 +65,7 @@ export function FacePanel({
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [mode, state]);
+  }, [expanded, mode, state]);
 
   const tierLabel =
     mode === "photoreal"
@@ -70,12 +75,23 @@ export function FacePanel({
         : "Tier 1 — Voice Shell";
 
   return (
-    <section className="flex flex-col items-center gap-6 border-b border-sag-border pb-8">
-      <header className="w-full space-y-1 text-center">
+    <section
+      className={`flex flex-col items-center gap-6 transition-all duration-300 ${
+        expanded
+          ? "min-h-[min(72vh,720px)] justify-center rounded-xl border border-sag-border bg-white/[0.02] px-6 py-10 md:px-10"
+          : "border-b border-sag-border pb-8"
+      }`}
+    >
+      <header className="relative w-full space-y-1 text-center">
+        {onToggleExpand && (
+          <div className="absolute right-0 top-0">
+            <PresenceExpandButton expanded={expanded} onClick={onToggleExpand} />
+          </div>
+        )}
         <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-sag-muted">
           SAG Presence
         </p>
-        <h2 className="text-lg font-medium tracking-tight text-sag-text">{tierLabel}</h2>
+        <h2 className="text-lg font-medium tracking-tight text-sag-text md:text-xl">{tierLabel}</h2>
         {mode === "photoreal" && !photorealAvailable && (
           <p className="text-xs text-amber-200/80">
             LiveKit not configured — set LIVEKIT_* in worker .env
@@ -90,6 +106,7 @@ export function FacePanel({
             state={state}
             caption={caption}
             amplitude={amplitude}
+            expanded={expanded}
             sessionActive={photorealActive}
             reconnectToken={reconnectToken}
             onStateChange={onFaceStateChange}
@@ -112,11 +129,25 @@ export function FacePanel({
           )}
         </>
       ) : mode === "pixel" ? (
-        <PixelHouseRenderer state={state} caption={caption} amplitude={amplitude} />
+        <PixelHouseRenderer
+          state={state}
+          caption={caption}
+          amplitude={amplitude}
+          expanded={expanded}
+        />
       ) : (
         <>
-          <PresenceFaceRenderer state={state} caption={caption} amplitude={amplitude} />
-          <p className="min-h-[4rem] max-w-[260px] text-center text-sm leading-relaxed text-sag-muted">
+          <PresenceFaceRenderer
+            state={state}
+            caption={caption}
+            amplitude={amplitude}
+            expanded={expanded}
+          />
+          <p
+            className={`text-center leading-relaxed text-sag-muted ${
+              expanded ? "min-h-[3rem] max-w-xl text-base" : "min-h-[4rem] max-w-[260px] text-sm"
+            }`}
+          >
             {caption || "Waiting for SAG to speak…"}
           </p>
         </>

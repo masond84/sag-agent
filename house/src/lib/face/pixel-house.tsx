@@ -39,7 +39,9 @@ interface AgentState {
 }
 
 const MOVE_INTERVAL_MS = 280;
+const MOVE_INTERVAL_EXPANDED_MS = 220;
 const DECISION_INTERVAL_MS = 6000;
+const DECISION_INTERVAL_EXPANDED_MS = 4500;
 const INTERACT_DURATION_MS = 2800;
 const ACTION_BAR_H = 18;
 
@@ -67,7 +69,7 @@ function directionBetween(from: GridPos, to: GridPos): AgentState["facing"] {
   return dy > 0 ? "down" : "up";
 }
 
-export function PixelHouseRenderer({ state, caption, amplitude }: FaceRendererProps) {
+export function PixelHouseRenderer({ state, caption, amplitude, expanded }: FaceRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const worldRef = useRef<PixelWorld>(buildPixelWorld());
   const agentRef = useRef<AgentState>(initialAgentState(worldRef.current));
@@ -77,10 +79,12 @@ export function PixelHouseRenderer({ state, caption, amplitude }: FaceRendererPr
   const stateRef = useRef(state);
   const captionRef = useRef(caption);
   const amplitudeRef = useRef(amplitude);
+  const expandedRef = useRef(expanded);
 
   stateRef.current = state;
   captionRef.current = caption;
   amplitudeRef.current = amplitude;
+  expandedRef.current = Boolean(expanded);
 
   useEffect(() => {
     const world = worldRef.current;
@@ -145,7 +149,8 @@ export function PixelHouseRenderer({ state, caption, amplitude }: FaceRendererPr
 
       if (
         !speaking &&
-        now - agent.lastDecisionAt > DECISION_INTERVAL_MS &&
+        now - agent.lastDecisionAt >
+          (expandedRef.current ? DECISION_INTERVAL_EXPANDED_MS : DECISION_INTERVAL_MS) &&
         agent.path.length === 0 &&
         now > agent.interactingUntil
       ) {
@@ -167,7 +172,12 @@ export function PixelHouseRenderer({ state, caption, amplitude }: FaceRendererPr
         }
       }
 
-      if (agent.path.length > 0 && now - lastMoveRef.current > MOVE_INTERVAL_MS && !speaking) {
+      if (
+        agent.path.length > 0 &&
+        now - lastMoveRef.current >
+          (expandedRef.current ? MOVE_INTERVAL_EXPANDED_MS : MOVE_INTERVAL_MS) &&
+        !speaking
+      ) {
         lastMoveRef.current = now;
         const next = agent.path.shift()!;
         agent.facing = directionBetween(agent.pos, next);
@@ -234,23 +244,35 @@ export function PixelHouseRenderer({ state, caption, amplitude }: FaceRendererPr
 
   const canvasSize = GRID_SIZE * CELL_PX;
   const canvasHeight = canvasSize + ACTION_BAR_H;
+  const displayScale = expanded ? 2.35 : 1;
+  const displayWidth = canvasSize * displayScale;
+  const displayHeight = canvasHeight * displayScale;
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-3 transition-all duration-300">
       <div
-        className="relative overflow-hidden rounded-md border-2 border-[#8b5e3c] bg-[#3a5a48] shadow-soft"
-        style={{ width: canvasSize, height: canvasHeight }}
+        className="relative overflow-hidden rounded-md border-2 border-[#8b5e3c] bg-[#3a5a48] shadow-soft transition-all duration-300"
+        style={{ width: displayWidth, height: displayHeight }}
       >
         <canvas
           ref={canvasRef}
           width={canvasSize}
           height={canvasHeight}
-          className="block"
-          style={{ imageRendering: "pixelated", width: canvasSize, height: canvasHeight }}
+          className="block origin-top-left transition-transform duration-300"
+          style={{
+            imageRendering: "pixelated",
+            width: canvasSize,
+            height: canvasHeight,
+            transform: `scale(${displayScale})`,
+          }}
           aria-label="SAG pixel house — autonomous mini avatar"
         />
       </div>
-      <p className="min-h-[4rem] max-w-[260px] text-center text-sm leading-relaxed text-sag-muted">
+      <p
+        className={`text-center leading-relaxed text-sag-muted transition-all duration-300 ${
+          expanded ? "min-h-[3rem] max-w-xl text-base" : "min-h-[4rem] max-w-[260px] text-sm"
+        }`}
+      >
         {caption || "SAG is exploring the house…"}
       </p>
     </div>

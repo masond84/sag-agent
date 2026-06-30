@@ -6,6 +6,7 @@ export interface FaceRendererProps {
   state: FaceState;
   caption: string;
   amplitude: number;
+  expanded?: boolean;
 }
 
 export interface FaceSessionConfig {

@@ -24,6 +24,7 @@ export function HouseDashboard() {
   const [photorealAvailable, setPhotorealAvailable] = useState(false);
   const [photorealError, setPhotorealError] = useState<string | null>(null);
   const [reconnectToken, setReconnectToken] = useState(0);
+  const [presenceExpanded, setPresenceExpanded] = useState(false);
   const avatarSpeakRef = useRef<LiveKitAvatarHandle | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -128,6 +129,32 @@ export function HouseDashboard() {
     return () => source?.close();
   }, [handleEvent]);
 
+  useEffect(() => {
+    if (!presenceExpanded) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPresenceExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [presenceExpanded]);
+
+  const facePanelProps = {
+    caption,
+    state: faceState,
+    mode: faceMode,
+    photorealActive,
+    photorealAvailable,
+    reconnectToken,
+    avatarSpeakRef,
+    onFaceStateChange: setFaceState,
+    onPhotorealError: setPhotorealError,
+    onRequestReconnect: requestAvatarReconnect,
+  };
+
   async function testSpeech() {
     const sample = "Hey Devin. House is online. Skill tree loaded and I'm ready to evolve.";
     await avatarSpeakRef.current?.unlockAudio();
@@ -177,26 +204,36 @@ export function HouseDashboard() {
       </header>
 
       <div className="grid gap-10 xl:grid-cols-[1fr_300px] xl:gap-12">
-        <SkillTreeGrid
-          payload={skillTree}
-          loading={loading}
-          selectedBranchId={selectedBranchId}
-          selectedNode={selectedNode}
-          onNodeSelect={(node, branch) => {
-            if (selectedBranchId === branch.id && selectedNode?.id === node.id) {
-              setSelectedBranchId(null);
-              setSelectedNode(null);
-              return;
-            }
-            setSelectedBranchId(branch.id);
-            setSelectedNode(node);
-          }}
-          onCloseDetail={() => {
-            setSelectedBranchId(null);
-            setSelectedNode(null);
-          }}
-          onSkillUpdated={() => void refreshSkillTree()}
-        />
+        <div className="min-w-0 transition-all duration-300">
+          {presenceExpanded ? (
+            <FacePanel
+              {...facePanelProps}
+              expanded
+              onToggleExpand={() => setPresenceExpanded(false)}
+            />
+          ) : (
+            <SkillTreeGrid
+              payload={skillTree}
+              loading={loading}
+              selectedBranchId={selectedBranchId}
+              selectedNode={selectedNode}
+              onNodeSelect={(node, branch) => {
+                if (selectedBranchId === branch.id && selectedNode?.id === node.id) {
+                  setSelectedBranchId(null);
+                  setSelectedNode(null);
+                  return;
+                }
+                setSelectedBranchId(branch.id);
+                setSelectedNode(node);
+              }}
+              onCloseDetail={() => {
+                setSelectedBranchId(null);
+                setSelectedNode(null);
+              }}
+              onSkillUpdated={() => void refreshSkillTree()}
+            />
+          )}
+        </div>
         <aside className="flex flex-col gap-8">
           <DevStatusPanel />
           {photorealError && (
@@ -204,18 +241,12 @@ export function HouseDashboard() {
               {photorealError}
             </p>
           )}
-          <FacePanel
-            caption={caption}
-            state={faceState}
-            mode={faceMode}
-            photorealActive={photorealActive}
-            photorealAvailable={photorealAvailable}
-            reconnectToken={reconnectToken}
-            avatarSpeakRef={avatarSpeakRef}
-            onFaceStateChange={setFaceState}
-            onPhotorealError={setPhotorealError}
-            onRequestReconnect={requestAvatarReconnect}
-          />
+          {!presenceExpanded && (
+            <FacePanel
+              {...facePanelProps}
+              onToggleExpand={() => setPresenceExpanded(true)}
+            />
+          )}
           <ActivityFeed events={events} />
         </aside>
       </div>

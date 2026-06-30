@@ -37,6 +37,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
   function LiveKitAvatarRenderer(
     {
       caption,
+      expanded,
       sessionActive,
       reconnectToken,
       onStateChange,
@@ -494,7 +495,11 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
   };
 
   return (
-    <div className="flex w-full max-w-sm flex-col items-center gap-4">
+    <div
+      className={`flex w-full flex-col items-center gap-4 transition-all duration-300 ${
+        expanded ? "max-w-2xl" : "max-w-sm"
+      }`}
+    >
       <div
         className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-sag-border bg-black/40 shadow-soft"
         onPointerDown={() => {
@@ -519,7 +524,11 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
           </div>
         )}
       </div>
-      <p className="min-h-[3rem] max-w-[280px] text-center text-sm leading-relaxed text-sag-muted">
+      <p
+        className={`text-center leading-relaxed text-sag-muted ${
+          expanded ? "min-h-[3rem] max-w-lg text-base" : "min-h-[3rem] max-w-[280px] text-sm"
+        }`}
+      >
         {caption || "Telegram and House activity play through the avatar. Mic input is off."}
       </p>
       <span className="rounded-md border border-sag-border bg-white/[0.03] px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-sag-muted">
