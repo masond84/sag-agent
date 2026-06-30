@@ -2,11 +2,18 @@ import "dotenv/config";
 import { access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { isMcpEnabled } from "../core/mcp/config.js";
+import { assertCalendarMcpInstalled } from "../core/mcp/calendar-mcp-path.js";
+import { ensureCalendarMcpOAuthKeysFile } from "../core/mcp/calendar-oauth-keys.js";
 import { assertGmailMcpInstalled } from "../core/mcp/gmail-mcp-path.js";
 import { ensureGmailMcpOAuthKeysFile, getGmailMcpKeysPath } from "../core/mcp/gmail-oauth-keys.js";
-
-const CREDENTIALS_FILE = path.join(os.homedir(), ".gmail-mcp", "credentials.json");
+import { isMcpEnabled } from "../core/mcp/config.js";
+const GMAIL_CREDENTIALS_FILE = path.join(os.homedir(), ".gmail-mcp", "credentials.json");
+const CALENDAR_CREDENTIALS_FILE = path.join(
+  os.homedir(),
+  ".config",
+  "google-calendar-mcp",
+  "tokens.json",
+);
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -50,25 +57,49 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const hasCredentials = await fileExists(CREDENTIALS_FILE);
-  if (hasCredentials) {
-    console.log(`Gmail MCP credentials: ${CREDENTIALS_FILE} (ready)`);
+  const hasGmailCredentials = await fileExists(GMAIL_CREDENTIALS_FILE);
+  if (hasGmailCredentials) {
+    console.log(`Gmail MCP credentials: ${GMAIL_CREDENTIALS_FILE} (ready)`);
+  } else {
+    console.log(`Gmail MCP credentials: not found (${GMAIL_CREDENTIALS_FILE})`);
+    console.log("  → npm run mcp:gmail-auth (stop House first — uses port 3000)");
+  }
+
+  try {
+    await assertCalendarMcpInstalled();
+    console.log("Calendar MCP package: installed");
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+
+  const calendarKeys = await ensureCalendarMcpOAuthKeysFile();
+  if (calendarKeys === "created") {
+    console.log("Calendar OAuth keys: created at data/calendar-mcp/gcp-oauth.keys.json");
+  } else if (calendarKeys === "exists") {
+    console.log("Calendar OAuth keys: data/calendar-mcp/gcp-oauth.keys.json (ready)");
+  } else {
+    console.log("Calendar OAuth keys: missing — need data/gmail-mcp/gcp-oauth.keys.json first");
+  }
+
+  const hasCalendarCredentials = await fileExists(CALENDAR_CREDENTIALS_FILE);
+  if (hasCalendarCredentials) {
+    console.log(`Calendar MCP credentials: ${CALENDAR_CREDENTIALS_FILE} (ready)`);
+  } else {
+    console.log(`Calendar MCP credentials: not found (${CALENDAR_CREDENTIALS_FILE})`);
+    console.log("  → Enable Calendar API in Google Cloud, then: npm run mcp:calendar-auth");
+  }
+
+  if (hasGmailCredentials && hasCalendarCredentials) {
     console.log("\nNext: npm run test:mcp");
-    console.log('      npm run test:mcp -- --query="after:2026/06/24"');
     console.log("\nRestart the worker (npm run dev) if it is already running.");
     return;
   }
 
-  console.log(`Gmail MCP credentials: not found (${CREDENTIALS_FILE})`);
-  console.log("\nNext steps:");
-  console.log("1. Stop SAG House if running (Gmail MCP auth uses port 3000)");
-  console.log("2. npm run mcp:gmail-auth");
-  console.log("3. Complete browser sign-in");
-  console.log("4. npm run test:mcp");
-  console.log("5. Restart worker: npm run dev");
-  console.log("\nThen ask in Telegram, e.g.:");
-  console.log('  "any emails from today?"');
-  console.log('  "search gmail for messages from conservice"');
+  if (!hasGmailCredentials || !hasCalendarCredentials) {
+    console.log("\nAfter auth: npm run test:mcp && npm run dev");
+    console.log('\nTelegram examples: "any emails from today?" / "what is on my calendar today?"');
+  }
 }
 
 main().catch((error) => {

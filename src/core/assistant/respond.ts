@@ -124,6 +124,7 @@ async function buildSystemPrompt(
     "Use tools when you need facts you do not already have in context below.",
     "- Bills, focus, skills, status → use the matching tool",
     "- Email search/read in Gmail → gmail__search_emails, gmail__read_email (Gmail query syntax in query)",
+    "- Calendar schedule → calendar__list-events, calendar__search-events, calendar__get-freebusy, calendar__get-current-time",
     "- Stored Conservice bills already processed → get_latest_utility_bill",
     "- What you did / who you are → get_sag_recent_activity + get_agent_memories",
     "",
