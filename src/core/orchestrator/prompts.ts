@@ -33,6 +33,10 @@ function prDeliverables(linearIssue?: Pick<LinearIssueRef, "identifier">): strin
     "- Run npm run build and fix any errors.",
     "- Open a pull request targeting main with a clear title and summary.",
     ...(idNote ? [idNote] : []),
+    "",
+    "Final response:",
+    "End with a brief 2-3 sentence summary in first-person voice (as SAG) explaining what you changed and why.",
+    "Example: 'I updated the skill tree descriptions to reflect current timing and features. The Home Base UI now shows accurate information about each capability.'",
   ].join("\n");
 }
 
