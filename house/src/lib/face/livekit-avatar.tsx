@@ -245,7 +245,11 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     }
 
     clearAvatarLossTimer();
-    setStatus((current) => (current === "live" ? "waiting" : current));
+    setAvatarStatus((current) => {
+      const next: AvatarConnectionStatus = current === "live" ? "waiting" : current;
+      onConnectionStatusRef.current?.(next);
+      return next;
+    });
 
     avatarLossTimerRef.current = setTimeout(() => {
       const room = roomRef.current;
