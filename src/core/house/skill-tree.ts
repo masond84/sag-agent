@@ -68,7 +68,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "comp-focus",
         label: "Focus",
-        description: "Anchor-hour focus check-ins (8am, 1pm, 9pm) tied to your daily goal.",
+        description: "Work focus check-ins at anchor hours (configurable, default 8am/1pm/9pm) tied to your daily goal.",
         x: 35,
         y: 62,
         requires: ["comp-root"],
@@ -77,7 +77,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "comp-life",
         label: "Life Texts",
-        description: "Random personal texts during the day — separate from work focus nudges.",
+        description: "Random personal check-ins throughout the day (up to 5/day, 8am-10pm window).",
         x: 65,
         y: 58,
         requires: ["comp-root"],
@@ -94,11 +94,11 @@ const BRANCH_DEFS: BranchDef[] = [
       },
       {
         id: "comp-voice",
-        label: "Voice",
-        description: "Read-aloud replies for voice hardware and the house presence shell (TTS).",
+        label: "Voice TTS",
+        description: "Text-to-speech for House UI presence shell and future voice hardware integration.",
         x: 28,
         y: 28,
-        requires: ["comp-life"],
+        requires: ["comp-morning"],
         skillId: null,
       },
     ],
@@ -120,7 +120,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "mem-user",
         label: "User Mem",
-        description: "Mem0 memories about you — preferences, facts, context from /remember.",
+        description: "Mem0 memories about you — preferences, facts, relationships. Use /remember to add, /memories to view.",
         x: 30,
         y: 65,
         requires: ["mem-root"],
@@ -129,7 +129,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "mem-agent",
         label: "Diary",
-        description: "SAG's own Mem0 diary — inner life distilled from the activity log.",
+        description: "SAG's Mem0 diary — distills activity log into agent memories (runs at 1pm and 9pm).",
         x: 70,
         y: 65,
         requires: ["mem-root"],
@@ -138,7 +138,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "mem-activity",
         label: "Timeline",
-        description: "Recent activity surfaced in chat recall and the house live feed.",
+        description: "Activity log tracking polls, check-ins, and dev cycles. View recent events in House feed.",
         x: 50,
         y: 42,
         requires: ["mem-user", "mem-agent"],
@@ -172,16 +172,16 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "com-tools",
         label: "Tools",
-        description: "Bills, focus, status, memories — fetched on demand instead of guessed.",
+        description: "Assistant tools: bills, focus, status, memories, activity, MCP connectors (Gmail search, etc).",
         x: 32,
         y: 60,
         requires: ["com-root"],
         skillId: "telegram-commands",
       },
       {
-        id: "com-voice-hw",
-        label: "Read Aloud",
-        description: "Voice-friendly reply format — short, plain text, no markdown lists.",
+        id: "com-mcp",
+        label: "MCP",
+        description: "Model Context Protocol connectors for external tools (Gmail, GitHub, etc).",
         x: 68,
         y: 55,
         requires: ["com-root"],
@@ -206,7 +206,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "mon-root",
         label: "Pulse",
-        description: "Daily heartbeat — SAG reports alive and recovers after downtime.",
+        description: "Daily heartbeat (every 24h) — SAG reports online status and recovers gracefully after downtime.",
         x: 50,
         y: 88,
         requires: [],
@@ -215,7 +215,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "mon-gmail",
         label: "Gmail",
-        description: "OAuth Gmail polling for email-triggered skills.",
+        description: "OAuth Gmail polling (every 10 min) — enables email-triggered skills like bills.",
         x: 28,
         y: 62,
         requires: ["mon-root"],
@@ -224,7 +224,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "mon-bills",
         label: "Bills",
-        description: "Conservice utility statements parsed and summarized to Telegram.",
+        description: "Watches for Conservice utility statements via Gmail. Parses charges and texts summary.",
         x: 72,
         y: 58,
         requires: ["mon-gmail"],
@@ -232,8 +232,8 @@ const BRANCH_DEFS: BranchDef[] = [
       },
       {
         id: "mon-health",
-        label: "Audit",
-        description: "Health audit via /status — Gmail, Telegram, and worker connectivity.",
+        label: "Status",
+        description: "Health check via /status — shows Gmail, Telegram, Mem0, MCP status and skill counts.",
         x: 50,
         y: 35,
         requires: ["mon-root"],
@@ -248,8 +248,8 @@ const BRANCH_DEFS: BranchDef[] = [
     nodes: [
       {
         id: "evo-root",
-        label: "Audit",
-        description: "Scheduled self-audit — small improvements when dev runner is enabled.",
+        label: "Cadence",
+        description: "Scheduled capability audit (every 6h) — finds small, high-value improvements to existing features.",
         x: 50,
         y: 88,
         requires: [],
@@ -258,7 +258,7 @@ const BRANCH_DEFS: BranchDef[] = [
       {
         id: "evo-linear",
         label: "Linear",
-        description: "Work tracked as Linear issues with scope and acceptance criteria.",
+        description: "Work tracked as Linear issues in SAG workspace with scope, acceptance criteria, and labels.",
         x: 30,
         y: 58,
         requires: ["evo-root"],
@@ -266,8 +266,8 @@ const BRANCH_DEFS: BranchDef[] = [
       },
       {
         id: "evo-cloud",
-        label: "Cloud Dev",
-        description: "Cursor Cloud implements changes on a branch and opens a PR.",
+        label: "Cursor",
+        description: "Cursor Cloud agents implement changes on feature branches with full repo context.",
         x: 70,
         y: 54,
         requires: ["evo-linear"],
@@ -275,8 +275,8 @@ const BRANCH_DEFS: BranchDef[] = [
       },
       {
         id: "evo-merge",
-        label: "Auto Merge",
-        description: "PRs merge to main when checks pass — SAG picks up latest code on next cycle.",
+        label: "Auto-merge",
+        description: "PRs auto-merge when checks pass. Worker pulls latest main on next cycle and restarts.",
         x: 50,
         y: 28,
         requires: ["evo-cloud"],
