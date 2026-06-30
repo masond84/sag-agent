@@ -7,7 +7,6 @@ import {
   getOrchestratorMode,
   isAutoMergeEnabled,
   isCursorOrchestratorMode,
-  isPostMergeAuditEnabled,
 } from "../orchestrator/config.js";
 import { pingLinear } from "../orchestrator/linear-client.js";
 import { getDevRunnerSummary, isDevRunnerEnabled } from "./state.js";
@@ -49,7 +48,6 @@ export async function getDevStatus(): Promise<string> {
     `- GitHub repo: ${getGithubRepo()}`,
     `- Repo root: ${getRepoRoot()}`,
     `- Auto merge: ${isAutoMergeEnabled()}`,
-    `- Post-merge audit: ${isPostMergeAuditEnabled()}`,
     `- Orchestrator env: ${envCheck.ok ? "ok" : `missing ${envCheck.missing.join(", ")}`}`,
     linearLine,
     `- GitHub CLI: ${ghStatus}`, "",

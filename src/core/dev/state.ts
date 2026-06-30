@@ -4,7 +4,7 @@ import path from "node:path";
 const DATA_DIR = path.resolve(process.cwd(), "data");
 const DEV_STATE_FILE = path.join(DATA_DIR, "dev-runner.json");
 
-export type DevTriggerKind = "post_merge" | "cadence" | "manual";
+export type DevTriggerKind = "cadence" | "manual";
 
 export interface DevTrigger {
   kind: DevTriggerKind;
@@ -32,7 +32,6 @@ interface DevRunnerState {
   lastCadenceRunAt?: string;
   runningSince?: string;
   pendingTriggers: DevTrigger[];
-  postMergeQueue: Array<{ prNumber: number; mergedAt: string; title?: string }>;
   recentRuns: DevRunRecord[];
 }
 
@@ -41,7 +40,7 @@ async function readDevState(): Promise<DevRunnerState> {
   try {
     return JSON.parse(await readFile(DEV_STATE_FILE, "utf8")) as DevRunnerState;
   } catch {
-    return { pendingTriggers: [], postMergeQueue: [], recentRuns: [] };
+    return { pendingTriggers: [], recentRuns: [] };
   }
 }
 
@@ -106,23 +105,6 @@ export async function queueManualDevTask(task: string, taskContext?: string): Pr
   await writeDevState(state);
 }
 
-export async function queuePostMergeScan(prNumber: number, title?: string): Promise<void> {
-  const state = await readDevState();
-  if (!state.postMergeQueue.some((item) => item.prNumber === prNumber)) {
-    state.postMergeQueue.push({ prNumber, mergedAt: new Date().toISOString(), title });
-  }
-  if (state.pendingTriggers.some((t) => t.kind === "post_merge" && t.prNumber === prNumber)) {
-    await writeDevState(state);
-    return;
-  }
-  state.pendingTriggers.push({
-    kind: "post_merge",
-    prNumber,
-    prTitle: title,
-    queuedAt: new Date().toISOString(),
-  });
-  await writeDevState(state);
-}
 
 export async function pickNextTrigger(): Promise<DevTrigger | null> {
   const state = await readDevState();
@@ -146,9 +128,6 @@ export async function recordDevRun(record: DevRunRecord): Promise<void> {
   const state = await readDevState();
   state.lastDevRunAt = record.finishedAt;
   state.recentRuns = [record, ...state.recentRuns].slice(0, 20);
-  if (record.mergedPrs.length > 0) {
-    state.postMergeQueue = state.postMergeQueue.filter((item) => !record.mergedPrs.includes(item.prNumber));
-  }
   await writeDevState(state);
 }
 
@@ -157,7 +136,6 @@ export async function getDevRunnerSummary(): Promise<string> {
   const lines = [
     `Last dev run: ${state.lastDevRunAt ?? "never"}`,
     `Pending triggers: ${state.pendingTriggers.length}`,
-    `Post-merge queue: ${state.postMergeQueue.map((i) => `#${i.prNumber}`).join(", ") || "none"}`,
     `Running: ${state.runningSince ? "yes" : "no"}`,
   ];
   if (state.recentRuns[0]) {

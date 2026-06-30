@@ -19,7 +19,7 @@ export interface LinearWorkspaceInfo {
   orchestratorLabels: string[];
 }
 
-const ORCHESTRATOR_LABELS = ["orchestrator", "implementation", "post-merge-audit", "cadence"] as const;
+const ORCHESTRATOR_LABELS = ["orchestrator", "implementation", "cadence"] as const;
 
 let cachedTeamId: string | undefined;
 let cachedProjectId: string | undefined;
@@ -51,7 +51,6 @@ export async function resolveLinearProjectId(): Promise<string | undefined> {
 }
 
 function triggerLabelName(kind: DevTriggerKind): string {
-  if (kind === "post_merge") return "post-merge-audit";
   if (kind === "cadence") return "cadence";
   return "implementation";
 }

@@ -12,7 +12,6 @@ export interface DevStatusPayload {
     task?: string;
     queuedAt: string;
   }>;
-  postMergeQueue: Array<{ prNumber: number; mergedAt: string; title?: string }>;
   lastRunAt?: string;
   recentBrief?: string;
   lastMergedPrs: number[];
@@ -27,7 +26,6 @@ export async function buildDevStatusPayload(): Promise<DevStatusPayload> {
       running: false,
       pendingCount: 0,
       pending: [],
-      postMergeQueue: [],
       lastMergedPrs: [],
     };
   }
@@ -46,7 +44,6 @@ export async function buildDevStatusPayload(): Promise<DevStatusPayload> {
       task: trigger.task,
       queuedAt: trigger.queuedAt,
     })),
-    postMergeQueue: state.postMergeQueue,
     lastRunAt: state.lastDevRunAt,
     recentBrief: recent?.brief?.slice(0, 500),
     lastMergedPrs: recent?.mergedPrs ?? [],

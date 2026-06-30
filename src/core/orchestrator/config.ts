@@ -18,10 +18,6 @@ export function isAutoMergeEnabled(): boolean {
   return (process.env.DEV_AUTO_MERGE ?? "true").toLowerCase() === "true";
 }
 
-export function isPostMergeAuditEnabled(): boolean {
-  return (process.env.DEV_POST_MERGE_AUDIT ?? "true").toLowerCase() === "true";
-}
-
 export function getLinearApiKey(): string | undefined {
   return process.env.LINEAR_API_KEY?.trim() || undefined;
 }

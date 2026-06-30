@@ -1,9 +1,7 @@
 import type { DevTrigger } from "../dev/state.js";
-import { queuePostMergeScan } from "../dev/state.js";
 import {
   checkOrchestratorEnv,
   isAutoMergeEnabled,
-  isPostMergeAuditEnabled,
 } from "./config.js";
 import { runCursorCloudAgent } from "./cursor-cloud.js";
 import { autoMergePullRequest, getPullRequestSummary, waitForPullRequest } from "./github.js";
@@ -74,9 +72,6 @@ export async function runOrchestratorCycle(trigger: DevTrigger): Promise<Orchest
     const merge = await autoMergePullRequest(pr.number);
     if (merge.merged) {
       mergedPrs.push(pr.number);
-      if (isPostMergeAuditEnabled()) {
-        await queuePostMergeScan(pr.number, merge.title);
-      }
     }
   }
 

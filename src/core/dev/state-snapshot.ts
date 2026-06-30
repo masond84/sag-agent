@@ -7,7 +7,6 @@ export interface DevStateSnapshot {
   lastCadenceRunAt?: string;
   runningSince?: string;
   pendingTriggers: DevTrigger[];
-  postMergeQueue: Array<{ prNumber: number; mergedAt: string; title?: string }>;
   recentRuns: DevRunRecord[];
 }
 
@@ -17,6 +16,6 @@ export async function readDevStateSnapshot(): Promise<DevStateSnapshot> {
   try {
     return JSON.parse(await readFile(DEV_STATE_FILE, "utf8")) as DevStateSnapshot;
   } catch {
-    return { pendingTriggers: [], postMergeQueue: [], recentRuns: [] };
+    return { pendingTriggers: [], recentRuns: [] };
   }
 }

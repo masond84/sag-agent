@@ -36,7 +36,6 @@ Autonomous code changes follow one pipeline:
 2. **Linear** — Work is tracked as issues in the SAG workspace (e.g. `SAG-6`). After a successful merge, SAG marks the issue Done and links the PR.
 3. **Cursor Cloud** — A cloud agent implements the change on a feature branch, runs `npm run build`, and opens a PR targeting `main`.
 4. **Auto-merge** — When checks pass, draft Cursor PRs are marked ready, then the PR merges to `main` and the worker picks up the latest code on the next cycle.
-5. **Post-merge audit** — When enabled (`DEV_POST_MERGE_AUDIT`, default on), SAG queues a follow-up Cursor Cloud review of `main` after each merge.
 
 ## Quick start
 
