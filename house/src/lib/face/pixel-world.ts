@@ -2,7 +2,7 @@ export const GRID_SIZE = 20;
 export const SAG_SIZE = 2;
 export const CELL_PX = 12;
 
-export type TileKind = "floor" | "wall" | "rug" | "wood";
+export type TileKind = "floor" | "wall" | "carpet" | "planks" | "tile" | "mat";
 
 export type ObjectKind =
   | "desk"
@@ -37,12 +37,12 @@ export interface PixelWorld {
 }
 
 const PALETTE = {
-  floor: "#141820",
-  floorAlt: "#11151c",
-  rug: "#1a2030",
-  wood: "#1c1814",
-  wall: "#2a3140",
-  wallEdge: "#3d4658",
+  floor: "#d8c4a0",
+  floorAlt: "#c8b490",
+  carpet: "#4a7ab8",
+  planks: "#c49a6c",
+  wall: "#e8d4a8",
+  wallEdge: "#8b5e3c",
 };
 
 export { PALETTE };
@@ -73,18 +73,30 @@ export function buildPixelWorld(): PixelWorld {
     }),
   );
 
-  // Rug in living area
-  for (let y = 3; y <= 8; y += 1) {
-    for (let x = 3; x <= 9; x += 1) {
-      tiles[y][x] = "rug";
+  // Living room carpet
+  for (let y = 3; y <= 9; y += 1) {
+    for (let x = 3; x <= 10; x += 1) {
+      tiles[y][x] = "carpet";
     }
   }
 
-  // Wood floor in office nook
-  for (let y = 3; y <= 10; y += 1) {
+  // Office wood planks
+  for (let y = 3; y <= 11; y += 1) {
     for (let x = 12; x <= 17; x += 1) {
-      tiles[y][x] = "wood";
+      tiles[y][x] = "planks";
     }
+  }
+
+  // Kitchen tiles
+  for (let y = 12; y <= 16; y += 1) {
+    for (let x = 11; x <= 17; x += 1) {
+      tiles[y][x] = "tile";
+    }
+  }
+
+  // Welcome mat by the door
+  for (let x = 9; x <= 10; x += 1) {
+    tiles[17][x] = "mat";
   }
 
   const objects: WorldObject[] = [
@@ -121,8 +133,8 @@ export function buildPixelWorld(): PixelWorld {
     {
       id: "bookshelf",
       kind: "bookshelf",
-      x: 5,
-      y: 11,
+      x: 4,
+      y: 10,
       w: 2,
       h: 1,
       label: "Memory shelf",
@@ -131,8 +143,8 @@ export function buildPixelWorld(): PixelWorld {
     {
       id: "plant",
       kind: "plant",
-      x: 8,
-      y: 13,
+      x: 7,
+      y: 14,
       w: 1,
       h: 2,
       label: "Plant",
