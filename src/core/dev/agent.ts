@@ -5,9 +5,6 @@ import type { DevTrigger } from "./state.js";
 import { devTools, executeDevTool, type DevSession } from "./tools.js";
 
 function buildTriggerPrompt(trigger: DevTrigger): string {
-  if (trigger.kind === "post_merge") {
-    return `Post-merge follow-up for PR #${trigger.prNumber}. Review and implement follow-ups.`;
-  }
   if (trigger.kind === "manual") {
     return formatManualTask(trigger);
   }

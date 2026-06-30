@@ -53,22 +53,6 @@ export function buildImplementationPrompt(task: string, linearIssue?: Pick<Linea
   ].join("\n");
 }
 
-export function buildPostMergePrompt(
-  prNumber: number,
-  prTitle?: string,
-  linearIssue?: Pick<LinearIssueRef, "identifier" | "url">,
-): string {
-  return [
-    `Post-merge audit for PR #${prNumber}${prTitle ? `: ${prTitle}` : ""}.`,
-    "",
-    baseContext(linearIssue),
-    "",
-    "Review the merged changes on main. Fix regressions, tighten types, improve tests or docs if needed.",
-    "If no follow-up is required, open a minimal PR that documents the audit outcome.",
-    "",
-    prDeliverables(linearIssue),
-  ].join("\n");
-}
 
 export function buildCadencePrompt(linearIssue?: Pick<LinearIssueRef, "identifier" | "url">): string {
   return [
@@ -99,10 +83,6 @@ export function buildOrchestratorPrompt(
   trigger: DevTrigger,
   linearIssue?: Pick<LinearIssueRef, "identifier" | "url">,
 ): { title: string; prompt: string } {
-  if (trigger.kind === "post_merge") {
-    const title = `Post-merge audit: PR #${trigger.prNumber ?? "?"}`;
-    return { title, prompt: buildPostMergePrompt(trigger.prNumber ?? 0, trigger.prTitle, linearIssue) };
-  }
   if (trigger.kind === "manual") {
     const task = formatManualTask(trigger);
     const titleSource = trigger.task?.trim() || "Implement requested change.";

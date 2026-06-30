@@ -5,7 +5,7 @@ import { runOrchestratorCycle } from "../orchestrator/runner.js";
 import { runDevAgent } from "./agent.js";
 import {
   acquireDevLock, isDevRunnerEnabled, isDevRunLocked, pickNextTrigger,
-  queuePostMergeScan, recordDevRun, releaseDevLock, type DevTrigger,
+  recordDevRun, releaseDevLock, type DevTrigger,
 } from "./state.js";
 
 export interface DevCycleResult {
@@ -49,7 +49,6 @@ export async function runDevCycle(force = false): Promise<DevCycleResult | null>
     }
 
     const result = await runDevAgent(trigger);
-    for (const n of result.mergedPrs) await queuePostMergeScan(n);
     await recordDevRun({
       id: randomUUID(),
       startedAt,

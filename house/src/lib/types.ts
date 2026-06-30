@@ -122,7 +122,6 @@ export interface DevStatusPayload {
   running: boolean;
   pendingCount: number;
   pending: Array<{ kind: string; task?: string; queuedAt: string }>;
-  postMergeQueue: Array<{ prNumber: number; mergedAt: string; title?: string }>;
   lastRunAt?: string;
   recentBrief?: string;
   lastMergedPrs: number[];
