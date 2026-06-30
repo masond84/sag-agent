@@ -24,6 +24,7 @@ export function HouseDashboard() {
   const [photorealAvailable, setPhotorealAvailable] = useState(false);
   const [photorealError, setPhotorealError] = useState<string | null>(null);
   const [reconnectToken, setReconnectToken] = useState(0);
+  const [presenceExpanded, setPresenceExpanded] = useState(false);
   const avatarSpeakRef = useRef<LiveKitAvatarHandle | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
 
@@ -38,6 +39,32 @@ export function HouseDashboard() {
     setPhotorealError(null);
     setReconnectToken((value) => value + 1);
   }, []);
+
+  const handleTierChange = useCallback(
+    (nextMode: FaceMode) => {
+      setPhotorealError(null);
+
+      if (faceMode === "photoreal" && photorealActive && nextMode !== "photoreal") {
+        setPhotorealActive(false);
+      }
+
+      if (nextMode === "photoreal") {
+        if (!photorealAvailable) {
+          return;
+        }
+        void avatarSpeakRef.current?.unlockAudio();
+        setFaceMode("photoreal");
+        if (!photorealActive) {
+          setPhotorealActive(true);
+          setReconnectToken((value) => value + 1);
+        }
+        return;
+      }
+
+      setFaceMode(nextMode);
+    },
+    [faceMode, photorealActive, photorealAvailable],
+  );
 
   const enqueueSpeech = useCallback((text: string) => {
     if (faceMode === "photoreal" && photorealActive) {
@@ -102,6 +129,32 @@ export function HouseDashboard() {
     return () => source?.close();
   }, [handleEvent]);
 
+  useEffect(() => {
+    if (!presenceExpanded) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPresenceExpanded(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [presenceExpanded]);
+
+  const facePanelProps = {
+    caption,
+    state: faceState,
+    mode: faceMode,
+    photorealActive,
+    photorealAvailable,
+    reconnectToken,
+    avatarSpeakRef,
+    onFaceStateChange: setFaceState,
+    onPhotorealError: setPhotorealError,
+    onRequestReconnect: requestAvatarReconnect,
+  };
+
   async function testSpeech() {
     const sample = "Hey Devin. House is online. Skill tree loaded and I'm ready to evolve.";
     await avatarSpeakRef.current?.unlockAudio();
@@ -124,8 +177,8 @@ export function HouseDashboard() {
             Home Base
           </h1>
           <p className="max-w-lg text-sm leading-relaxed text-sag-muted">
-            Skill constellation, live activity, and swappable face — Tier 1 for ambient pings,
-            Tier 3 photoreal for on-demand face-to-face sessions.
+            Skill constellation, live activity, and swappable presence — Tier 1 voice shell,
+            Tier 2 pixel house, Tier 3 photoreal for face-to-face sessions.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -141,50 +194,46 @@ export function HouseDashboard() {
           >
             Test voice
           </button>
-          {photorealAvailable && (
-            <button
-              type="button"
-              onClick={() => {
-                setPhotorealError(null);
-                if (faceMode === "photoreal" && photorealActive) {
-                  setPhotorealActive(false);
-                  setFaceMode("presence");
-                  return;
-                }
-                void avatarSpeakRef.current?.unlockAudio();
-                setFaceMode("photoreal");
-                setPhotorealActive(true);
-                setReconnectToken((value) => value + 1);
-              }}
-              className="rounded-md border border-sag-border bg-white/[0.03] px-4 py-2 text-xs font-medium text-sag-text transition hover:bg-white/[0.06]"
-            >
-              {faceMode === "photoreal" && photorealActive ? "End face-to-face" : "Face-to-face"}
-            </button>
-          )}
+          <TierSelect
+            value={faceMode}
+            photorealAvailable={photorealAvailable}
+            photorealActive={photorealActive}
+            onChange={handleTierChange}
+          />
         </div>
       </header>
 
       <div className="grid gap-10 xl:grid-cols-[1fr_300px] xl:gap-12">
-        <SkillTreeGrid
-          payload={skillTree}
-          loading={loading}
-          selectedBranchId={selectedBranchId}
-          selectedNode={selectedNode}
-          onNodeSelect={(node, branch) => {
-            if (selectedBranchId === branch.id && selectedNode?.id === node.id) {
-              setSelectedBranchId(null);
-              setSelectedNode(null);
-              return;
-            }
-            setSelectedBranchId(branch.id);
-            setSelectedNode(node);
-          }}
-          onCloseDetail={() => {
-            setSelectedBranchId(null);
-            setSelectedNode(null);
-          }}
-          onSkillUpdated={() => void refreshSkillTree()}
-        />
+        <div className="min-w-0 transition-all duration-300">
+          {presenceExpanded ? (
+            <FacePanel
+              {...facePanelProps}
+              expanded
+              onToggleExpand={() => setPresenceExpanded(false)}
+            />
+          ) : (
+            <SkillTreeGrid
+              payload={skillTree}
+              loading={loading}
+              selectedBranchId={selectedBranchId}
+              selectedNode={selectedNode}
+              onNodeSelect={(node, branch) => {
+                if (selectedBranchId === branch.id && selectedNode?.id === node.id) {
+                  setSelectedBranchId(null);
+                  setSelectedNode(null);
+                  return;
+                }
+                setSelectedBranchId(branch.id);
+                setSelectedNode(node);
+              }}
+              onCloseDetail={() => {
+                setSelectedBranchId(null);
+                setSelectedNode(null);
+              }}
+              onSkillUpdated={() => void refreshSkillTree()}
+            />
+          )}
+        </div>
         <aside className="flex flex-col gap-8">
           <DevStatusPanel />
           {photorealError && (
@@ -192,18 +241,12 @@ export function HouseDashboard() {
               {photorealError}
             </p>
           )}
-          <FacePanel
-            caption={caption}
-            state={faceState}
-            mode={faceMode}
-            photorealActive={photorealActive}
-            photorealAvailable={photorealAvailable}
-            reconnectToken={reconnectToken}
-            avatarSpeakRef={avatarSpeakRef}
-            onFaceStateChange={setFaceState}
-            onPhotorealError={setPhotorealError}
-            onRequestReconnect={requestAvatarReconnect}
-          />
+          {!presenceExpanded && (
+            <FacePanel
+              {...facePanelProps}
+              onToggleExpand={() => setPresenceExpanded(true)}
+            />
+          )}
           <ActivityFeed events={events} />
         </aside>
       </div>
@@ -222,5 +265,42 @@ function StatusPill({ label, ok }: { label: string; ok: boolean }) {
     >
       {label}
     </span>
+  );
+}
+
+function TierSelect({
+  value,
+  photorealAvailable,
+  photorealActive,
+  onChange,
+}: {
+  value: FaceMode;
+  photorealAvailable: boolean;
+  photorealActive: boolean;
+  onChange: (mode: FaceMode) => void;
+}) {
+  return (
+    <label className="relative inline-flex items-center">
+      <span className="sr-only">Presence tier</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as FaceMode)}
+        className="appearance-none rounded-md border border-sag-border bg-white/[0.03] py-2 pl-3 pr-8 text-xs font-medium text-sag-text transition hover:bg-white/[0.06] focus:border-sag-accent focus:outline-none focus:ring-1 focus:ring-sag-accent/40"
+      >
+        <option value="presence">Tier 1 — Voice Shell</option>
+        <option value="pixel">Tier 2 — Pixel House</option>
+        {photorealAvailable && (
+          <option value="photoreal">
+            Tier 3 — Photoreal{photorealActive ? " (live)" : ""}
+          </option>
+        )}
+      </select>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute right-2.5 text-[10px] text-sag-muted"
+      >
+        ▾
+      </span>
+    </label>
   );
 }
