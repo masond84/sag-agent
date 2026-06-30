@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   LiveKitAvatarRenderer,
+  PixelHouseRenderer,
   PresenceFaceRenderer,
   type AvatarConnectionStatus,
   type FaceMode,
@@ -62,7 +63,11 @@ export function FacePanel({
   }, [mode, state]);
 
   const tierLabel =
-    mode === "photoreal" ? "Tier 3 — Photoreal Face" : "Tier 1 — Voice Shell";
+    mode === "photoreal"
+      ? "Tier 3 — Photoreal Face"
+      : mode === "pixel"
+        ? "Tier 2 — Pixel House"
+        : "Tier 1 — Voice Shell";
 
   return (
     <section className="flex flex-col items-center gap-6 border-b border-sag-border pb-8">
@@ -106,6 +111,8 @@ export function FacePanel({
             </button>
           )}
         </>
+      ) : mode === "pixel" ? (
+        <PixelHouseRenderer state={state} caption={caption} amplitude={amplitude} />
       ) : (
         <>
           <PresenceFaceRenderer state={state} caption={caption} amplitude={amplitude} />

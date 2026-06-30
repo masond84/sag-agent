@@ -1,6 +1,6 @@
 import type { FaceState } from "@/lib/types";
 
-export type FaceMode = "presence" | "photoreal";
+export type FaceMode = "presence" | "pixel" | "photoreal";
 
 export interface FaceRendererProps {
   state: FaceState;

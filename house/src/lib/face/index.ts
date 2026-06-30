@@ -9,5 +9,6 @@ export type {
   LiveKitAvatarHandle,
 } from "./types";
 export { PresenceFaceRenderer } from "./presence";
+export { PixelHouseRenderer } from "./pixel-house";
 export { LiveKitAvatarRenderer } from "./livekit-avatar";
 export { fetchFaceSessionConfig, startFaceSession, endFaceSession } from "./session";
