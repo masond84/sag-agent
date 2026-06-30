@@ -34,7 +34,7 @@ export function formatSkillCatalog(skills: SkillSummary[]): string {
 
   lines.push("");
   lines.push(
-    "Slash commands: /help, /skills, /status, /focus, /profile, /remember, /memories, /sag-memories, /clear, /dev, /ping",
+    "Slash commands: /help, /today, /skills, /status, /focus, /profile, /remember, /memories, /sag-memories, /clear, /dev, /ping",
   );
 
   return lines.join("\n");

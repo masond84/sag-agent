@@ -1,10 +1,16 @@
 import { summarizeRecentActivity } from "../activity-log.js";
-import { formatTodayFocusSummary, getTodayFocusDay } from "../focus.js";
+import { formatDailyDigest } from "../daily-digest.js";
+import { formatTodayFocusSummary, getTodayFocusDay, setTodayFocus } from "../focus.js";
 import { compareToPrevious, formatBillSummary, getBillHistory, getLatestBill } from "../bills.js";
 import { formatSkillCatalogForAssistant } from "../skill-catalog.js";
 import { formatHealthAudit } from "../health-audit.js";
 import { formatConversationHighlights } from "../memory/conversation.js";
-import { listAgentMemories, resolveMemoryUserId, searchAgentMemories } from "../memory/mem0-service.js";
+import {
+  addExplicitMemory,
+  listAgentMemories,
+  resolveMemoryUserId,
+  searchAgentMemories,
+} from "../memory/mem0-service.js";
 import { executeMcpTool, getMcpToolDefinitions, isMcpToolName } from "../mcp/index.js";
 import type { ToolDefinition } from "../llm.js";
 import type { InteractiveSkillContext } from "../../types.js";
@@ -44,6 +50,38 @@ export const nativeAssistantTools: ToolDefinition[] = [
   {
     name: "get_today_focus",
     description: "Get today's daily focus, check-in history, and whether focus has been set.",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "set_today_focus",
+    description:
+      "Set or replace today's focus. Use when the user says they want to focus on, work on, or prioritize something today.",
+    parameters: {
+      type: "object",
+      properties: {
+        focus: { type: "string", description: "The user's focus for today." },
+      },
+      required: ["focus"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "remember_user_fact",
+    description:
+      "Save a durable fact about the user. Use when the user asks you to remember a preference, identity detail, project, or decision.",
+    parameters: {
+      type: "object",
+      properties: {
+        fact: { type: "string", description: "The durable fact to remember about the user." },
+      },
+      required: ["fact"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_today_digest",
+    description:
+      "Get a user-facing summary of today's focus, recent SAG activity, latest utility bill, active skills, and runtime mode.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -126,6 +164,31 @@ export async function executeAssistantTool(
       const day = await getTodayFocusDay();
       return formatTodayFocusSummary(day);
     }
+
+    case "set_today_focus": {
+      const focus = typeof args.focus === "string" ? args.focus.trim() : "";
+      if (!focus) {
+        return "No focus was provided.";
+      }
+      const day = await setTodayFocus(focus);
+      return `Today's focus is now: ${day.focus}`;
+    }
+
+    case "remember_user_fact": {
+      const fact = typeof args.fact === "string" ? args.fact.trim() : "";
+      if (!fact) {
+        return "No memory fact was provided.";
+      }
+      try {
+        await addExplicitMemory(memoryUserId, fact);
+        return `Saved memory: ${fact}`;
+      } catch (error) {
+        return `Could not save memory: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+
+    case "get_today_digest":
+      return formatDailyDigest(context);
 
     case "get_sag_recent_activity": {
       const sinceHours = Math.min(Math.max(Number(args.since_hours ?? 48) || 48, 1), 168);
