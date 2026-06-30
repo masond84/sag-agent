@@ -1,5 +1,6 @@
 # MCP connector registry — add servers here; SAG spawns each as a stdio child process.
-# Gmail auth: place gcp-oauth.keys.json in data/gmail-mcp/ then run npm run mcp:gmail-auth
+# Gmail auth: data/gmail-mcp/gcp-oauth.keys.json then npm run mcp:gmail-auth
+# Calendar auth: same OAuth keys file, enable Calendar API, then npm run mcp:calendar-auth
 
 servers:
   gmail:
@@ -12,3 +13,19 @@ servers:
       - search_emails
       - read_email
       - list_email_labels
+
+  calendar:
+    enabled: true
+    command: node
+    args: ["{ROOT}/node_modules/@cocal/google-calendar-mcp/build/index.js"]
+    tool_prefix: calendar
+    env:
+      GOOGLE_OAUTH_CREDENTIALS: "{ROOT}/data/calendar-mcp/gcp-oauth.keys.json"
+    # Read-only — expand when create/update/delete are trusted.
+    allowed_tools:
+      - list-calendars
+      - list-events
+      - search-events
+      - get-event
+      - get-freebusy
+      - get-current-time

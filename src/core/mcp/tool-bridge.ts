@@ -52,7 +52,9 @@ export function mapServerTools(server: McpServerConfig, listedTools: McpListedTo
       `(MCP connector: ${server.id})`,
       server.id === "gmail"
         ? "Use Gmail search syntax in query: from:, subject:, after:YYYY/MM/DD, before:, is:unread, label:."
-        : "",
+        : server.id === "calendar"
+          ? "Use for schedule questions: list-events/search-events with timeMin/timeMax or natural date ranges."
+          : "",
     ]
       .filter(Boolean)
       .join(" ");
