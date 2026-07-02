@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { ServiceUsage, RevenueStats, ServiceStats } from "../types.js";
+import type { ServiceUsage, RevenueStats, ServiceStats } from "../../types.js";
 
 const DATA_DIR = path.join(process.cwd(), "data", "income-services");
 const USAGE_LOG = path.join(DATA_DIR, "usage.jsonl");

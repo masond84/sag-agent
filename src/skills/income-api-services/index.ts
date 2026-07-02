@@ -69,6 +69,7 @@ async function buildIncomeContext(): Promise<IncomeGoalContext> {
     weeklyGoal: WEEKLY_GOAL,
     currentWeekRevenue: revenue.thisWeek,
     gap: WEEKLY_GOAL - revenue.thisWeek,
+    daysUntilGoal: revenue.daysUntilGoal,
     topServices,
     recentFailures,
     marketingNeeds,

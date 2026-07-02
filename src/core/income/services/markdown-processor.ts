@@ -1,6 +1,6 @@
 import { marked } from "marked";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import type { ServiceUsage } from "../../types.js";
+import type { ServiceUsage } from "../../../types.js";
 import { logServiceUsage } from "../revenue-tracking.js";
 import { getServiceConfig } from "../service-config.js";
 

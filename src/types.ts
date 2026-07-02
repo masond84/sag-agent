@@ -232,6 +232,7 @@ export interface IncomeGoalContext {
   weeklyGoal: number;
   currentWeekRevenue: number;
   gap: number;
+  daysUntilGoal: number;
   topServices: ServiceStats[];
   recentFailures: ServiceUsage[];
   marketingNeeds: string[];
