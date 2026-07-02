@@ -21,6 +21,7 @@ import { focusCompanionSkill } from "../skills/focus/index.js";
 import { reflectionSkill } from "../skills/reflection/index.js";
 import { commandsSkill } from "../skills/commands/index.js";
 import { gmailPollSkill } from "../skills/gmail-poll/index.js";
+import { incomeApiServicesSkill } from "../skills/income-api-services/index.js";
 
 const CONFIG_DIR = path.resolve(process.cwd(), "config/skills");
 
@@ -35,6 +36,7 @@ const scheduledSkillFactories: Record<string, () => ScheduledSkill> = {
   "morning-briefing": () => morningSkill,
   "focus-companion": () => focusCompanionSkill,
   reflection: () => reflectionSkill,
+  "income-api-services": () => incomeApiServicesSkill,
 };
 
 const interactiveSkillFactories: Record<string, () => InteractiveSkill> = {

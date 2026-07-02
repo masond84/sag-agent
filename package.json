@@ -42,7 +42,8 @@
     "house:start": "npm run start --prefix house -- --port 3000",
     "house:restart": "bash scripts/house-restart.sh",
     "face:agent": "tsx src/scripts/face-agent.ts",
-    "sag:refresh": "bash scripts/sag-refresh.sh"
+    "sag:refresh": "bash scripts/sag-refresh.sh",
+    "test:income": "tsx src/scripts/test-income.ts"
   },
   "engines": {
     "node": ">=20"
@@ -57,7 +58,10 @@
     "googleapis": "^144.0.0",
     "grammy": "^1.44.0",
     "livekit-server-sdk": "^2.13.0",
+    "marked": "^15.0.6",
     "mem0ai": "^3.0.8",
+    "pdf-lib": "^1.17.1",
+    "stripe": "^17.5.0",
     "yaml": "^2.7.0"
   },
   "devDependencies": {

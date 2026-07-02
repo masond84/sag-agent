@@ -28,6 +28,10 @@ import {
 } from "./livekit-session.js";
 import { buildAssistantReply } from "./assistant-reply.js";
 import type { InteractiveSkillContext } from "../../types.js";
+import { getRevenueStats, getServiceStats, validateAPIKey } from "../income/revenue-tracking.js";
+import { getEnabledServices } from "../income/service-config.js";
+import { mergePDFs, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
+import { markdownToPDF } from "../income/services/markdown-processor.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 export type HouseInteractiveContextProvider = () => Promise<InteractiveSkillContext>;
@@ -357,6 +361,119 @@ async function handleRequest(
       title: goal.title,
       message: `Queued build for ${goal.title}. Dev runner will pick it up on the next cycle.`,
     });
+    return;
+  }
+
+  if (path === "/api/income/stats" && req.method === "GET") {
+    const stats = await getRevenueStats();
+    const serviceStats = await getServiceStats();
+    sendJson(res, 200, { revenue: stats, services: serviceStats });
+    return;
+  }
+
+  if (path === "/api/income/services" && req.method === "GET") {
+    const services = await getEnabledServices();
+    sendJson(res, 200, { services });
+    return;
+  }
+
+  if (path === "/api/services/pdf/merge" && req.method === "POST") {
+    const raw = await readBody(req);
+    let files: Buffer[] = [];
+    let customerId: string | undefined;
+    
+    try {
+      const parsed = JSON.parse(raw) as { files: string[]; metadata?: { title?: string; author?: string }; customerId?: string };
+      files = parsed.files.map(f => Buffer.from(f, "base64"));
+      customerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+    
+    try {
+      const result = await mergePDFs({ files }, customerId);
+      sendJson(res, 200, { pdf: result.toString("base64") });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/pdf/split" && req.method === "POST") {
+    const raw = await readBody(req);
+    let file: Buffer;
+    let pages: number[] | undefined;
+    let customerId: string | undefined;
+    
+    try {
+      const parsed = JSON.parse(raw) as { file: string; pages?: number[]; customerId?: string };
+      file = Buffer.from(parsed.file, "base64");
+      pages = parsed.pages;
+      customerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+    
+    try {
+      const results = await splitPDF({ file, pages }, customerId);
+      sendJson(res, 200, { pdfs: results.map(r => r.toString("base64")) });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/pdf/compress" && req.method === "POST") {
+    const raw = await readBody(req);
+    let file: Buffer;
+    let customerId: string | undefined;
+    
+    try {
+      const parsed = JSON.parse(raw) as { file: string; customerId?: string };
+      file = Buffer.from(parsed.file, "base64");
+      customerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+    
+    try {
+      const result = await compressPDF({ file }, customerId);
+      sendJson(res, 200, { pdf: result.toString("base64") });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/markdown-to-pdf" && req.method === "POST") {
+    const raw = await readBody(req);
+    let markdown: string;
+    let options: { title?: string; author?: string; fontSize?: number; pageSize?: "letter" | "a4" } | undefined;
+    let customerId: string | undefined;
+    
+    try {
+      const parsed = JSON.parse(raw) as { markdown: string; options?: typeof options; customerId?: string };
+      markdown = parsed.markdown;
+      options = parsed.options;
+      customerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+    
+    try {
+      const result = await markdownToPDF({ markdown, options }, customerId);
+      sendJson(res, 200, { pdf: result.toString("base64") });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
     return;
   }
 

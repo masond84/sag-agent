@@ -2,6 +2,24 @@
 
 Self-hosted personal agent: Telegram chat, Gmail monitoring, scheduled check-ins, optional autonomous dev runner.
 
+## Core Mission: Autonomous Income Generation
+
+**SAG's primary job is to build and operate API service businesses autonomously.**
+
+Target: $200/week minimum revenue through API service arbitrage and original services.
+
+SAG goes to work every day on:
+
+1. **Build & Deploy** — Creates professional API service websites (PDF tools, document conversion, translation, transcription, data enrichment, image processing, etc.)
+2. **Operate Services** — Autonomously fulfills customer requests, processes payments, handles rate limiting and usage tracking
+3. **Market Itself** — Generates SEO content, posts to social platforms, maintains product listings, optimizes conversion funnels
+4. **Evolve** — Monitors service performance, identifies new opportunities, implements improvements, optimizes pricing, adds features based on customer demand
+5. **Report Progress** — Tracks daily/weekly revenue, analyzes service metrics, reports on progress towards income goals
+
+This income-generation mission runs continuously alongside all other capabilities (companion, bills, focus, dev runner). The autonomous dev runner prioritizes tasks that move towards the revenue goal while maintaining code quality and existing features.
+
+Revenue tracking and service analytics are stored in `data/income-services/` and visible in the House UI dashboard.
+
 ## Architecture
 
 Three independent loops (same process):
@@ -9,7 +27,7 @@ Three independent loops (same process):
 | Loop | Driver | Handles |
 |------|--------|---------|
 | **Chat** | Grammy long-polling | Telegram commands + natural language |
-| **Schedule** | Croner (`* * * * *` by default) | Focus, life companion, reflection, morning, heartbeat, dev-runner |
+| **Schedule** | Croner (`* * * * *` by default) | Income services, focus, life companion, reflection, morning, heartbeat, dev-runner |
 | **Email** | `POLL_INTERVAL_MS` (default 10 min) | Gmail skills (e.g. Conservice bills) |
 
 Skills are configured in `config/skills/` and implemented under `src/skills/`. Each YAML file has an `enabled` flag that must be true for the skill to load; some skills also honor runtime env toggles (e.g. `MORNING_BRIEFING_ENABLED`).
@@ -77,6 +95,10 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `REFLECTION_ENABLED` | Agent diary writes from activity log |
 | `MCP_ENABLED` | `true` = spawn MCP servers from `config/mcp-servers.yaml` as assistant tools |
 | `MEM0_ENABLED` | Local or platform Mem0 for user + agent memory |
+| `INCOME_SERVICES_ENABLED` | `true` = activate API service business operations (default true) |
+| `INCOME_WEEKLY_GOAL` | Target weekly revenue in dollars (default 200) |
+| `STRIPE_SECRET_KEY` | Stripe API key for payment processing |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 
 ## Useful scripts
 
@@ -102,6 +124,65 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run test:mcp` | List MCP connectors; optional `--query="after:2026/06/24"` Gmail search |
 | `npm run mcp:gmail-auth` | One-time Gmail MCP OAuth (uses `data/gmail-mcp/`) |
 | `npm run house:build` | Production build for house/ |
+| `npm run test:income` | Preview income service status and revenue tracking |
+
+## API Service Business
+
+SAG operates a portfolio of API services autonomously. Services are accessible via the House server when `HOUSE_SERVER_ENABLED=true` and public endpoints are configured.
+
+### Service Portfolio
+
+**Tier 1: Core Services**
+- **PDF Tools** — Merge, split, compress, OCR, watermark
+- **Document Conversion** — Markdown to PDF (with templates), HTML to PDF, format conversions
+- **Image Optimization** — Resize, compress, format conversion, watermarking
+
+**Tier 2: API Arbitrage**
+- **Translation API** — DeepL backend with 3x markup
+- **Transcription API** — Whisper/AssemblyAI with 2x markup
+- **Data Enrichment** — Company info, email validation, domain lookup
+
+**Tier 3: Agent-Built Services**
+- New services identified and implemented autonomously based on market demand
+
+### How It Works
+
+1. **Service Health** — Agent monitors all endpoints, tracks error rates, ensures uptime
+2. **Request Fulfillment** — Incoming API calls are processed automatically, payments verified, results delivered
+3. **Revenue Tracking** — All usage logged to `data/income-services/usage.jsonl`, daily totals in `data/income-services/revenue.json`
+4. **Marketing** — Agent generates SEO content, posts to relevant platforms, maintains product listings
+5. **Evolution** — Agent analyzes metrics, identifies improvements, queues dev tasks via Cursor Cloud
+6. **Reporting** — Weekly progress updates via Telegram, dashboard in House UI
+
+### Revenue Goal
+
+Target: $200/week minimum ($867/month)
+
+Progress tracked in real-time. Agent prioritizes tasks that move towards this goal:
+- Performance optimizations (faster = better UX = more customers)
+- New service launches (more offerings = more revenue streams)
+- Marketing content (better SEO = more traffic = more conversions)
+- Pricing optimization (test different price points for maximum revenue)
+
+### Payment Processing
+
+Stripe integration for:
+- One-time payments (pay-per-use API calls)
+- Prepaid credits (API key accounts)
+- Subscription tiers (monthly service access)
+
+All payments tracked and reconciled automatically.
+
+### Data Storage
+
+```
+data/income-services/
+├── usage.jsonl          # Every API call logged
+├── revenue.json         # Daily/weekly/monthly totals
+├── customers.json       # API key registry
+├── services.json        # Service configuration and pricing
+└── marketing-log.jsonl  # Content published, platforms, engagement
+```
 
 ## Deployment
 
