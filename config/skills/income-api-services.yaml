@@ -1,0 +1,12 @@
+id: income-api-services
+name: API Service Business Operator
+enabled: true
+kind: scheduled
+goal: Generate $200/week via autonomous API service operations
+description: |
+  Operates a portfolio of API services autonomously:
+  - Monitors service health and fulfills requests
+  - Tracks revenue and progress towards weekly goal
+  - Generates marketing content and manages listings
+  - Identifies opportunities for new services
+  - Queues dev tasks for improvements and expansions

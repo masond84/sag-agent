@@ -164,3 +164,80 @@ export function isScheduledSkillConfig(config: SkillConfig): config is Scheduled
 export function isInteractiveSkillConfig(config: SkillConfig): config is InteractiveSkillConfig {
   return config.kind === "interactive";
 }
+
+// Income Service Types
+
+export interface ServiceConfig {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  pricing: {
+    model: "per_unit" | "per_call" | "subscription";
+    unit?: string;
+    pricePerUnit?: number;
+    pricePerCall?: number;
+    monthlyPrice?: number;
+  };
+  backend: {
+    type: "local" | "api_proxy";
+    apiProvider?: string;
+    costPerUnit?: number;
+  };
+  limits?: {
+    maxSize?: number;
+    maxPages?: number;
+    rateLimit?: number;
+  };
+}
+
+export interface ServiceUsage {
+  timestamp: string;
+  serviceId: string;
+  units: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  customerId?: string;
+  success: boolean;
+  errorMessage?: string;
+}
+
+export interface RevenueStats {
+  today: number;
+  yesterday: number;
+  thisWeek: number;
+  lastWeek: number;
+  thisMonth: number;
+  lastMonth: number;
+  allTime: number;
+  weeklyGoal: number;
+  weeklyProgress: number;
+  daysUntilGoal: number;
+}
+
+export interface ServiceStats {
+  serviceId: string;
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
+  averageProfit: number;
+  lastUsed?: string;
+}
+
+export interface IncomeGoalContext {
+  weeklyGoal: number;
+  currentWeekRevenue: number;
+  gap: number;
+  topServices: ServiceStats[];
+  recentFailures: ServiceUsage[];
+  marketingNeeds: string[];
+  developmentPriorities: Array<{
+    task: string;
+    impact: "high" | "medium" | "low";
+    reason: string;
+  }>;
+}
