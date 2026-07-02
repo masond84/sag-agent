@@ -22,6 +22,9 @@ export function getSkillDescription(skillId: string): string | undefined {
   return SKILL_DESCRIPTIONS[skillId];
 }
 
+const SLASH_COMMANDS_LINE =
+  "Slash commands: /help, /today, /skills, /status, /focus, /profile, /remember, /memories, /sag-memories, /clear, /dev, /ping";
+
 export function formatSkillCatalog(skills: SkillSummary[]): string {
   if (skills.length === 0) {
     return "No active skills loaded.";
@@ -33,9 +36,7 @@ export function formatSkillCatalog(skills: SkillSummary[]): string {
   }
 
   lines.push("");
-  lines.push(
-    "Slash commands: /help, /today, /skills, /status, /focus, /profile, /remember, /memories, /sag-memories, /clear, /dev, /ping",
-  );
+  lines.push(SLASH_COMMANDS_LINE);
 
   return lines.join("\n");
 }
@@ -45,5 +46,8 @@ export function formatSkillCatalogForAssistant(skills: SkillSummary[]): string {
     return "No active skills loaded.";
   }
 
-  return skills.map((skill) => `${skill.name} (${skill.kind}): ${describeSkill(skill)}`).join("\n");
+  const lines = skills.map((skill) => `${skill.name} (${skill.kind}): ${describeSkill(skill)}`);
+  lines.push("");
+  lines.push(SLASH_COMMANDS_LINE);
+  return lines.join("\n");
 }
