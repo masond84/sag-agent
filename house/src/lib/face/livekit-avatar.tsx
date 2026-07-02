@@ -13,12 +13,21 @@ import {
 import { isAvatarVideoParticipant, speakTextViaAgent } from "@/lib/face/agent-speak";
 import type { AvatarConnectionStatus, FaceRendererProps, LiveKitAvatarHandle } from "@/lib/face/types";
 import type { FaceState } from "@/lib/types";
-import { endFaceSession, fetchFaceSessionConfig, startFaceSession } from "@/lib/face/session";
+import { endFaceSession, fetchFaceSessionConfig, fetchFaceSessionStatus, startFaceSession } from "@/lib/face/session";
 import { stripMarkdownForSpeech } from "@/lib/worker";
 
-const AUTO_RECONNECT_DELAY_MS = 4_000;
+const AUTO_RECONNECT_BASE_MS = 5_000;
+const AUTO_RECONNECT_MAX_MS = 60_000;
+const AVATAR_READY_TIMEOUT_MS = 45_000;
+const AVATAR_STATUS_POLL_MS = 4_000;
 const AVATAR_LOSS_GRACE_MS = 8_000;
-const MAX_AUTO_RECONNECTS = 12;
+const MAX_AUTO_RECONNECTS = 8;
+
+interface SessionCredentials {
+  sessionId: string;
+  token: string;
+  livekitUrl: string;
+}
 
 function roomHasAvatar(room: Room): boolean {
   return [...room.remoteParticipants.values()].some((p) => isAvatarVideoParticipant(p.identity));
@@ -27,10 +36,11 @@ function roomHasAvatar(room: Room): boolean {
 interface LiveKitAvatarRendererProps extends FaceRendererProps {
   sessionActive: boolean;
   reconnectToken: number;
+  reconnectHard?: boolean;
   onStateChange?: (state: FaceState) => void;
   onError?: (message: string) => void;
   onConnectionStatusChange?: (status: AvatarConnectionStatus) => void;
-  onRequestReconnect?: () => void;
+  onRequestReconnect?: (hard?: boolean) => void;
 }
 
 export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvatarRendererProps>(
@@ -40,6 +50,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       expanded,
       sessionActive,
       reconnectToken,
+      reconnectHard = false,
       onStateChange,
       onError,
       onConnectionStatusChange,
@@ -51,9 +62,12 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
   const audioRef = useRef<HTMLAudioElement>(null);
   const roomRef = useRef<Room | null>(null);
   const pendingAudioUnlockRef = useRef(false);
-  const sessionIdRef = useRef<string | null>(null);
+  const sessionCredentialsRef = useRef<SessionCredentials | null>(null);
+  const avatarReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const avatarStatusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const connectGenerationRef = useRef(0);
   const autoReconnectCountRef = useRef(0);
+  const blockingErrorRef = useRef(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const avatarLossTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -101,10 +115,73 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     }
   }, []);
 
+  const clearAvatarReadyTimer = useCallback(() => {
+    if (avatarReadyTimerRef.current) {
+      clearTimeout(avatarReadyTimerRef.current);
+      avatarReadyTimerRef.current = null;
+    }
+  }, []);
+
+  const clearAvatarStatusPoll = useCallback(() => {
+    if (avatarStatusPollRef.current) {
+      clearInterval(avatarStatusPollRef.current);
+      avatarStatusPollRef.current = null;
+    }
+  }, []);
+
+  const formatAvatarProviderError = useCallback((detail: string): string => {
+    const lower = detail.toLowerCase();
+    if (lower.includes("429") || lower.includes("rate limit")) {
+      return "Simli rate limit reached. Wait a minute, then tap Reconnect face (avoid rapid retries).";
+    }
+    if (lower.includes("simli") || lower.includes("avatar")) {
+      return `Avatar provider error: ${detail}`;
+    }
+    return `Avatar failed to load: ${detail}`;
+  }, []);
+
   const setStatus = useCallback((status: AvatarConnectionStatus) => {
     setAvatarStatus(status);
     onConnectionStatusRef.current?.(status);
-  }, []);
+    if (status === "live") {
+      clearAvatarReadyTimer();
+      clearAvatarStatusPoll();
+    }
+  }, [clearAvatarReadyTimer, clearAvatarStatusPoll]);
+
+  const pollAvatarSessionStatus = useCallback(async (sessionId: string) => {
+    const status = await fetchFaceSessionStatus(sessionId);
+    if (!status) {
+      return;
+    }
+
+    if (status.avatarStatus === "ready") {
+      clearAvatarReadyTimer();
+      clearAvatarStatusPoll();
+      return;
+    }
+
+    if (status.avatarStatus === "error" && status.avatarError) {
+      clearAvatarReadyTimer();
+      clearAvatarStatusPoll();
+      blockingErrorRef.current = true;
+      onErrorRef.current?.(formatAvatarProviderError(status.avatarError));
+      setStatus("lost");
+    }
+  }, [clearAvatarReadyTimer, clearAvatarStatusPoll, formatAvatarProviderError, setStatus]);
+
+  const startAvatarReadyWatch = useCallback((sessionId: string) => {
+    clearAvatarReadyTimer();
+    clearAvatarStatusPoll();
+
+    avatarReadyTimerRef.current = setTimeout(() => {
+      void pollAvatarSessionStatus(sessionId);
+    }, AVATAR_READY_TIMEOUT_MS);
+
+    avatarStatusPollRef.current = setInterval(() => {
+      void pollAvatarSessionStatus(sessionId);
+    }, AVATAR_STATUS_POLL_MS);
+  }, [clearAvatarReadyTimer, clearAvatarStatusPoll, pollAvatarSessionStatus]);
 
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -201,9 +278,11 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
     }
   }, [attachAudioTrack, attachVideoTrack]);
 
-  const teardownCurrentSession = useCallback(async () => {
+  const disconnectRoomOnly = useCallback(async () => {
     clearReconnectTimer();
     clearAvatarLossTimer();
+    clearAvatarReadyTimer();
+    clearAvatarStatusPoll();
 
     const room = roomRef.current;
     roomRef.current = null;
@@ -213,31 +292,46 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       await room.disconnect();
     }
 
-    const sessionId = sessionIdRef.current;
-    sessionIdRef.current = null;
-    if (sessionId) {
-      await endFaceSession(sessionId);
-    }
-
     detachVideo();
-  }, [clearAvatarLossTimer, clearReconnectTimer, detachVideo]);
+  }, [clearAvatarLossTimer, clearAvatarReadyTimer, clearAvatarStatusPoll, clearReconnectTimer, detachVideo]);
+
+  const destroySession = useCallback(async () => {
+    await disconnectRoomOnly();
+
+    const credentials = sessionCredentialsRef.current;
+    sessionCredentialsRef.current = null;
+    if (credentials?.sessionId) {
+      await endFaceSession(credentials.sessionId);
+    }
+  }, [disconnectRoomOnly]);
+
+  const reconnectDelayMs = useCallback(() => {
+    const attempt = autoReconnectCountRef.current;
+    return Math.min(AUTO_RECONNECT_BASE_MS * 2 ** attempt, AUTO_RECONNECT_MAX_MS);
+  }, []);
 
   const scheduleAutoReconnect = useCallback(() => {
     if (!sessionActive) {
       return;
     }
+    if (blockingErrorRef.current) {
+      setStatus("lost");
+      return;
+    }
     if (autoReconnectCountRef.current >= MAX_AUTO_RECONNECTS) {
+      onErrorRef.current?.("Avatar reconnect limit reached. Tap Reconnect face to try again.");
       setStatus("lost");
       return;
     }
 
     clearReconnectTimer();
     setStatus("reconnecting");
+    const delayMs = reconnectDelayMs();
     reconnectTimerRef.current = setTimeout(() => {
       autoReconnectCountRef.current += 1;
-      onRequestReconnectRef.current?.();
-    }, AUTO_RECONNECT_DELAY_MS);
-  }, [clearReconnectTimer, sessionActive, setStatus]);
+      onRequestReconnectRef.current?.(false);
+    }, delayMs);
+  }, [clearReconnectTimer, reconnectDelayMs, sessionActive, setStatus]);
 
   const scheduleAvatarLossCheck = useCallback(() => {
     if (!sessionActive) {
@@ -280,11 +374,11 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
 
   const disconnect = useCallback(async () => {
     connectGenerationRef.current += 1;
-    await teardownCurrentSession();
+    await destroySession();
     setConnectionState(ConnectionState.Disconnected);
     setStatus("off");
     onStateChangeRef.current?.("idle");
-  }, [setStatus, teardownCurrentSession]);
+  }, [destroySession, setStatus]);
 
   const enqueueAgentSpeech = useCallback((text: string) => {
     const cleaned = stripMarkdownForSpeech(text);
@@ -338,7 +432,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         return;
       }
 
-      await teardownCurrentSession();
+      await disconnectRoomOnly();
       if (cancelled || generation !== connectGenerationRef.current) {
         return;
       }
@@ -350,7 +444,12 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         return;
       }
 
-      const session = await startFaceSession();
+      const needsNewSession = reconnectHard || !sessionCredentialsRef.current;
+      if (reconnectHard) {
+        blockingErrorRef.current = false;
+        autoReconnectCountRef.current = 0;
+      }
+      const session = await startFaceSession({ forceNew: needsNewSession });
       if (!session?.ok || !session.token) {
         onErrorRef.current?.(session?.error ?? "Could not start face session.");
         setStatus("lost");
@@ -358,11 +457,18 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       }
 
       if (cancelled || generation !== connectGenerationRef.current) {
-        await endFaceSession(session.sessionId);
+        if (needsNewSession) {
+          await endFaceSession(session.sessionId);
+        }
         return;
       }
 
-      sessionIdRef.current = session.sessionId;
+      sessionCredentialsRef.current = {
+        sessionId: session.sessionId,
+        token: session.token,
+        livekitUrl: session.livekitUrl,
+      };
+      startAvatarReadyWatch(session.sessionId);
       onStateChangeRef.current?.("thinking");
 
       const room = new Room({
@@ -449,10 +555,15 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       });
 
       try {
-        await room.connect(session.livekitUrl, session.token);
+        const credentials = sessionCredentialsRef.current;
+        if (!credentials) {
+          setStatus("lost");
+          return;
+        }
+
+        await room.connect(credentials.livekitUrl, credentials.token);
         if (cancelled || generation !== connectGenerationRef.current) {
           await room.disconnect();
-          await endFaceSession(session.sessionId);
           return;
         }
         await tryUnlockAfterConnect(room);
@@ -463,7 +574,7 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
         const detail = error instanceof Error ? error.message : String(error);
         onErrorRef.current?.(`LiveKit connect failed: ${detail}`);
         setStatus("lost");
-        await disconnect();
+        scheduleAutoReconnect();
       }
     }
 
@@ -473,10 +584,12 @@ export const LiveKitAvatarRenderer = forwardRef<LiveKitAvatarHandle, LiveKitAvat
       cancelled = true;
       clearReconnectTimer();
       clearAvatarLossTimer();
+      clearAvatarReadyTimer();
+      clearAvatarStatusPoll();
     };
-    // reconnectToken intentionally triggers a fresh room when user/auto reconnects
+    // reconnectToken / reconnectHard intentionally trigger reconnect logic
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionActive, reconnectToken]);
+  }, [sessionActive, reconnectToken, reconnectHard]);
 
   const overlayMessage =
     avatarStatus === "reconnecting"

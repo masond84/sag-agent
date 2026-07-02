@@ -4,6 +4,7 @@ SAG photoreal face agent — LiveKit Agents + Simli avatar.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -114,8 +115,110 @@ class SAGBridgedAgent(Agent):
         raise StopResponse()
 
 
+async def _report_avatar_status(session_id: str, status: str, error: str | None = None) -> None:
+    if not session_id:
+        return
+
+    payload: dict[str, str] = {"status": status}
+    if error:
+        payload["error"] = error[:500]
+
+    timeout = aiohttp.ClientTimeout(total=10)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                f"{_worker_url()}/face-session/{session_id}/avatar-status",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                if response.status >= 400:
+                    body = await response.text()
+                    logger.warning(
+                        "Avatar status report failed (%s): %s",
+                        response.status,
+                        body[:200],
+                    )
+    except Exception:
+        logger.warning("Avatar status report to worker failed", exc_info=True)
+
+
+def _session_id_from_room(room: rtc.Room) -> str:
+    try:
+        meta = json.loads(room.metadata or "{}")
+        return str(meta.get("sessionId", "")).strip()
+    except json.JSONDecodeError:
+        return ""
+
+
+def _is_avatar_participant(identity: str) -> bool:
+    ident = identity.lower()
+    return "simli" in ident or ("avatar" in ident and "agent" in ident)
+
+
+def _room_has_avatar_video(room: rtc.Room) -> bool:
+    for participant in room.remote_participants.values():
+        if not _is_avatar_participant(participant.identity):
+            continue
+        for publication in participant.track_publications.values():
+            if publication.kind == rtc.TrackKind.KIND_VIDEO:
+                return True
+    return False
+
+
+async def _wait_for_avatar_video(room: rtc.Room, timeout: float = 25.0) -> bool:
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if _room_has_avatar_video(room):
+            return True
+        await asyncio.sleep(0.5)
+    return False
+
+
+async def _start_simli_avatar(
+    avatar: simli.AvatarSession,
+    session: AgentSession,
+    room: rtc.Room,
+    session_id: str,
+) -> bool:
+    retry_delays = [0, 5, 15, 35]
+    last_error = "Avatar video did not appear"
+
+    for attempt, delay in enumerate(retry_delays):
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+        try:
+            await avatar.start(session, room=room)
+        except Exception as exc:
+            last_error = str(exc)
+            logger.warning("Simli avatar start attempt %d failed: %s", attempt + 1, last_error)
+            if "429" not in last_error and "rate limit" not in last_error.lower():
+                if attempt >= len(retry_delays) - 1:
+                    break
+                continue
+            if attempt >= len(retry_delays) - 1:
+                break
+            continue
+
+        if await _wait_for_avatar_video(room):
+            await _report_avatar_status(session_id, "ready")
+            logger.info("Simli avatar video live for room %s", room.name)
+            return True
+
+        last_error = "Avatar connected but video track never appeared"
+        logger.warning("Simli avatar attempt %d: no video track in room", attempt + 1)
+
+    await _report_avatar_status(session_id, "error", last_error)
+    logger.error("Simli avatar failed for room %s: %s", room.name, last_error)
+    return False
+
+
 async def entrypoint(ctx: JobContext) -> None:
     await ctx.connect()
+
+    session_id = _session_id_from_room(ctx.room)
+    if session_id:
+        await _report_avatar_status(session_id, "pending")
 
     simli_key = os.getenv("SIMLI_API_KEY", "").strip()
     simli_face = os.getenv("SIMLI_FACE_ID", "").strip()
@@ -183,14 +286,25 @@ async def entrypoint(ctx: JobContext) -> None:
                 max_session_length=max_session,
             ),
         )
-        await avatar.start(session, room=ctx.room)
-        logger.info(
-            "Simli avatar started for room %s (idle=%ss session=%ss)",
-            ctx.room.name,
-            max_idle,
-            max_session,
-        )
+        started = await _start_simli_avatar(avatar, session, ctx.room, session_id)
+        if started:
+            logger.info(
+                "Simli avatar started for room %s (idle=%ss session=%ss)",
+                ctx.room.name,
+                max_idle,
+                max_session,
+            )
+        else:
+            logger.error(
+                "Simli avatar unavailable for room %s — voice-only fallback",
+                ctx.room.name,
+            )
     else:
+        await _report_avatar_status(
+            session_id,
+            "error",
+            "SIMLI_API_KEY or SIMLI_FACE_ID missing on face agent",
+        )
         logger.warning("SIMLI_API_KEY or SIMLI_FACE_ID missing — voice-only session in room")
 
     if voice_input:

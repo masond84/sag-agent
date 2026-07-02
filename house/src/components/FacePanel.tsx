@@ -19,13 +19,14 @@ interface FacePanelProps {
   photorealActive: boolean;
   photorealAvailable: boolean;
   reconnectToken: number;
+  reconnectHard?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
   avatarSpeakRef?: React.RefObject<LiveKitAvatarHandle | null>;
   onFaceStateChange?: (state: FaceState) => void;
   onPhotorealError?: (message: string) => void;
   onAvatarStatusChange?: (status: AvatarConnectionStatus) => void;
-  onRequestReconnect?: () => void;
+  onRequestReconnect?: (hard?: boolean) => void;
 }
 
 export function FacePanel({
@@ -35,6 +36,7 @@ export function FacePanel({
   photorealActive,
   photorealAvailable,
   reconnectToken,
+  reconnectHard = false,
   expanded = false,
   onToggleExpand,
   avatarSpeakRef,
@@ -109,6 +111,7 @@ export function FacePanel({
             expanded={expanded}
             sessionActive={photorealActive}
             reconnectToken={reconnectToken}
+            reconnectHard={reconnectHard}
             onStateChange={onFaceStateChange}
             onError={onPhotorealError}
             onConnectionStatusChange={(status) => {
@@ -120,7 +123,7 @@ export function FacePanel({
           {photorealActive && (avatarStatus === "lost" || avatarStatus === "reconnecting") && (
             <button
               type="button"
-              onClick={onRequestReconnect}
+              onClick={() => onRequestReconnect?.(true)}
               disabled={avatarStatus === "reconnecting"}
               className="rounded-md border border-sag-border bg-white/[0.06] px-4 py-2 text-xs font-medium text-sag-text transition hover:bg-white/[0.1] disabled:opacity-50"
             >
