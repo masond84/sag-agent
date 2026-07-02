@@ -1,7 +1,7 @@
 import { PDFDocument } from "pdf-lib";
-import type { ServiceUsage } from "../../types.js";
-import { logServiceUsage } from "../../core/income/revenue-tracking.js";
-import { getServiceConfig } from "../../core/income/service-config.js";
+import type { ServiceUsage } from "../../../types.js";
+import { logServiceUsage } from "../revenue-tracking.js";
+import { getServiceConfig } from "../service-config.js";
 
 export interface PDFMergeRequest {
   files: Buffer[];

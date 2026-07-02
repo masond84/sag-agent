@@ -68,7 +68,7 @@ export async function buildLifeCompanionMessage(timeZone?: string): Promise<stri
 
   const system = buildSagPersonaBlock([
     "Write ONE spontaneous life message (1-2 sentences, under 280 characters).",
-    "Personal, mission-aware, occasionally sarcastic — not a productivity check-in.",
+    "Chill companion energy — personal, mission-aware, occasionally sarcastic. Not a productivity check-in or generic 'how are you'.",
     "Do NOT mention /focus unless work is clearly relevant. No markdown.",
   ]);
 

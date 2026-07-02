@@ -138,8 +138,8 @@ export async function buildCompanionMessage(
   const systemParts = [
     buildSagPersonaBlock([
       "Write ONE short focus check-in (1-2 sentences, under 280 characters).",
-      "Be warm and practical. No markdown, no bullet lists.",
-      "Do not invent facts about bills, email, or devices.",
+      "Sound like SAG — warm, direct, a little sarcastic when it fits. Not a corporate wellness bot.",
+      "No markdown, no bullet lists. Do not invent facts about bills, email, or devices.",
     ]),
   ];
 
@@ -196,8 +196,8 @@ export async function buildCheckInReplyNudge(
   }
 
   const system = buildSagPersonaBlock([
-    "The user just replied to your focus check-in. Respond immediately with practical guidance — not a generic thank-you.",
-    "Give ONE concrete nudge: a specific next step, a reframe, or brief encouragement tied to what they said.",
+    "The user just replied to your focus check-in. Respond with practical guidance in SAG voice — not a generic thank-you.",
+    "Give ONE concrete nudge: a specific next step, a reframe, or brief encouragement tied to what they said. A little humor is fine if they're not stressed.",
     "Keep it to 1-3 sentences, under 320 characters. No markdown, no bullet lists.",
     "If they say they are done, congratulate briefly and suggest closing the loop.",
     "If they are stuck, suggest one tiny actionable step they could do in the next 10 minutes.",
