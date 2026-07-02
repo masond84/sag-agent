@@ -22,7 +22,8 @@ export interface AssistantToolOptions {
 export const nativeAssistantTools: ToolDefinition[] = [
   {
     name: "get_agent_status",
-    description: "Get current SAG health audit including host, last check, skills, Gmail/Telegram status.",
+    description:
+      "Get current SAG health audit: host, last check, skill counts, Gmail/Telegram/Assistant/Mem0/MCP status, messages processed, dry-run mode.",
     parameters: { type: "object", properties: {}, additionalProperties: false },
   },
   {
