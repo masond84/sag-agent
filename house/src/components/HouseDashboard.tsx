@@ -23,7 +23,7 @@ export function HouseDashboard() {
   const [photorealActive, setPhotorealActive] = useState(false);
   const [photorealAvailable, setPhotorealAvailable] = useState(false);
   const [photorealError, setPhotorealError] = useState<string | null>(null);
-  const [reconnectToken, setReconnectToken] = useState(0);
+  const [reconnectRequest, setReconnectRequest] = useState({ token: 0, hard: false });
   const [presenceExpanded, setPresenceExpanded] = useState(false);
   const avatarSpeakRef = useRef<LiveKitAvatarHandle | null>(null);
   const speechQueueRef = useRef<Promise<void>>(Promise.resolve());
@@ -35,9 +35,9 @@ export function HouseDashboard() {
     setLoading(false);
   }, []);
 
-  const requestAvatarReconnect = useCallback(() => {
+  const requestAvatarReconnect = useCallback((hard = false) => {
     setPhotorealError(null);
-    setReconnectToken((value) => value + 1);
+    setReconnectRequest((value) => ({ token: value.token + 1, hard }));
   }, []);
 
   const handleTierChange = useCallback(
@@ -56,7 +56,7 @@ export function HouseDashboard() {
         setFaceMode("photoreal");
         if (!photorealActive) {
           setPhotorealActive(true);
-          setReconnectToken((value) => value + 1);
+          setReconnectRequest((value) => ({ token: value.token + 1, hard: false }));
         }
         return;
       }
@@ -86,10 +86,23 @@ export function HouseDashboard() {
 
   const handleEvent = useCallback(
     (event: HouseEvent) => {
-      setEvents((current) => [...current.slice(-49), event]);
+      setEvents((current) => {
+        const merged = [...current.slice(-49), event];
+        const seen = new Set<string>();
+        return merged.filter((item) => {
+          if (seen.has(item.id)) {
+            return false;
+          }
+          seen.add(item.id);
+          return true;
+        });
+      });
 
       if (event.kind === "connected") {
         setConnected(true);
+        void fetchFaceSessionConfig().then((config) => {
+          setPhotorealAvailable(Boolean(config?.enabled));
+        });
       }
 
       if (event.kind === "speech" && event.speech) {
@@ -116,6 +129,11 @@ export function HouseDashboard() {
     void load();
     const refresh = setInterval(() => {
       void refreshSkillTree();
+      void fetchFaceSessionConfig().then((config) => {
+        if (mounted) {
+          setPhotorealAvailable(Boolean(config?.enabled));
+        }
+      });
     }, 60_000);
 
     return () => {
@@ -148,7 +166,8 @@ export function HouseDashboard() {
     mode: faceMode,
     photorealActive,
     photorealAvailable,
-    reconnectToken,
+    reconnectToken: reconnectRequest.token,
+    reconnectHard: reconnectRequest.hard,
     avatarSpeakRef,
     onFaceStateChange: setFaceState,
     onPhotorealError: setPhotorealError,

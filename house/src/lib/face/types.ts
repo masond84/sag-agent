@@ -22,7 +22,15 @@ export interface FaceSessionStartResult {
   token: string;
   livekitUrl: string;
   avatarProvider: string;
+  reused?: boolean;
   error?: string;
+}
+
+export interface FaceSessionStatusResult {
+  sessionId: string;
+  avatarStatus: "pending" | "ready" | "error";
+  avatarError?: string;
+  avatarUpdatedAt?: string;
 }
 
 export type AvatarConnectionStatus =

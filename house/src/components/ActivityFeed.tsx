@@ -25,7 +25,7 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
             .slice(0, 20)
             .map((event, index) => (
               <li
-                key={"id" in event ? event.id : `${event.at}-${index}`}
+                key={"id" in event ? `${event.id}-${index}` : `${event.at}-${index}`}
                 className="rounded-lg border border-sag-border bg-white/[0.02] px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-3 text-[11px] text-sag-muted">

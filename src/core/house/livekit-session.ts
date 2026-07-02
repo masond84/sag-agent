@@ -2,15 +2,23 @@ import { randomBytes } from "node:crypto";
 import { AccessToken, AgentDispatchClient, RoomServiceClient } from "livekit-server-sdk";
 import { getFaceSessionEnv } from "./face-config.js";
 
+export type FaceAvatarStatus = "pending" | "ready" | "error";
+
 export interface FaceSessionRecord {
   sessionId: string;
   roomName: string;
   createdAt: string;
   participantIdentity: string;
+  participantName: string;
+  avatarStatus: FaceAvatarStatus;
+  avatarError?: string;
+  avatarUpdatedAt?: string;
 }
 
 export interface FaceSessionStartPayload {
   participantName?: string;
+  /** Tear down any existing room and create a fresh LiveKit + Simli session. */
+  forceNew?: boolean;
 }
 
 export interface FaceSessionStartResponse {
@@ -20,6 +28,7 @@ export interface FaceSessionStartResponse {
   token: string;
   livekitUrl: string;
   avatarProvider: string;
+  reused?: boolean;
   error?: string;
 }
 
@@ -29,7 +38,18 @@ export interface FaceSessionConfigResponse {
   avatarProvider: string;
 }
 
+export interface FaceSessionStatusResponse {
+  sessionId: string;
+  avatarStatus: FaceAvatarStatus;
+  avatarError?: string;
+  avatarUpdatedAt?: string;
+}
+
 const activeSessions = new Map<string, FaceSessionRecord>();
+let lastNewRoomAt = 0;
+
+const NEW_ROOM_COOLDOWN_MS = Number(process.env.FACE_SESSION_COOLDOWN_MS ?? 20_000);
+const SESSION_REUSE_MAX_AGE_MS = Number(process.env.FACE_SESSION_REUSE_MAX_AGE_MS ?? 7_200_000);
 
 function createSessionId(): string {
   return randomBytes(8).toString("hex");
@@ -39,6 +59,40 @@ function createRoomName(sessionId: string): string {
   return `sag-face-${sessionId}`;
 }
 
+function getReusableSession(): FaceSessionRecord | null {
+  const sessions = [...activeSessions.values()];
+  if (sessions.length !== 1) {
+    return null;
+  }
+
+  const session = sessions[0]!;
+  const ageMs = Date.now() - new Date(session.createdAt).getTime();
+  if (ageMs > SESSION_REUSE_MAX_AGE_MS) {
+    return null;
+  }
+
+  return session;
+}
+
+async function issueParticipantToken(
+  record: FaceSessionRecord,
+): Promise<string> {
+  const env = getFaceSessionEnv();
+  const token = new AccessToken(env.livekitApiKey, env.livekitApiSecret, {
+    identity: record.participantIdentity,
+    name: record.participantName,
+    ttl: "2h",
+  });
+  token.addGrant({
+    roomJoin: true,
+    room: record.roomName,
+    canPublish: false,
+    canSubscribe: true,
+    canPublishData: true,
+  });
+  return token.toJwt();
+}
+
 export function getFaceSessionConfig(): FaceSessionConfigResponse {
   const env = getFaceSessionEnv();
   return {
@@ -46,6 +100,42 @@ export function getFaceSessionConfig(): FaceSessionConfigResponse {
     livekitUrl: env.livekitUrl,
     avatarProvider: env.avatarProvider,
   };
+}
+
+export function getFaceSessionStatus(sessionId: string): FaceSessionStatusResponse | null {
+  const record = activeSessions.get(sessionId);
+  if (!record) {
+    return null;
+  }
+
+  return {
+    sessionId: record.sessionId,
+    avatarStatus: record.avatarStatus,
+    avatarError: record.avatarError,
+    avatarUpdatedAt: record.avatarUpdatedAt,
+  };
+}
+
+export function setFaceSessionAvatarStatus(
+  sessionId: string,
+  status: FaceAvatarStatus,
+  error?: string,
+): { ok: boolean; error?: string } {
+  const record = activeSessions.get(sessionId);
+  if (!record) {
+    return { ok: false, error: "Session not found" };
+  }
+
+  record.avatarStatus = status;
+  record.avatarUpdatedAt = new Date().toISOString();
+  if (error) {
+    record.avatarError = error.slice(0, 500);
+  } else {
+    delete record.avatarError;
+  }
+
+  activeSessions.set(sessionId, record);
+  return { ok: true };
 }
 
 export async function startFaceSession(
@@ -64,12 +154,48 @@ export async function startFaceSession(
     };
   }
 
+  const forceNew = payload.forceNew ?? false;
+  const participantName = payload.participantName?.trim() || "Devin";
+
+  if (!forceNew) {
+    const reusable = getReusableSession();
+    if (reusable) {
+      const token = await issueParticipantToken(reusable);
+      return {
+        ok: true,
+        sessionId: reusable.sessionId,
+        roomName: reusable.roomName,
+        token,
+        livekitUrl: env.livekitUrl,
+        avatarProvider: env.avatarProvider,
+        reused: true,
+      };
+    }
+  }
+
+  const sinceLastRoomMs = Date.now() - lastNewRoomAt;
+  if (forceNew && sinceLastRoomMs < NEW_ROOM_COOLDOWN_MS && activeSessions.size > 0) {
+    const reusable = getReusableSession();
+    if (reusable) {
+      const token = await issueParticipantToken(reusable);
+      return {
+        ok: true,
+        sessionId: reusable.sessionId,
+        roomName: reusable.roomName,
+        token,
+        livekitUrl: env.livekitUrl,
+        avatarProvider: env.avatarProvider,
+        reused: true,
+        error: `New session cooldown active (${Math.ceil((NEW_ROOM_COOLDOWN_MS - sinceLastRoomMs) / 1000)}s) — reusing current room`,
+      };
+    }
+  }
+
   await endAllFaceSessions();
 
   const sessionId = createSessionId();
   const roomName = createRoomName(sessionId);
   const participantIdentity = `sag-user-${sessionId}`;
-  const participantName = payload.participantName?.trim() || "Devin";
 
   const roomClient = new RoomServiceClient(env.livekitUrl, env.livekitApiKey, env.livekitApiSecret);
   await roomClient.createRoom({
@@ -83,20 +209,14 @@ export async function startFaceSession(
     }),
   });
 
-  const token = new AccessToken(env.livekitApiKey, env.livekitApiSecret, {
-    identity: participantIdentity,
-    name: participantName,
-    ttl: "2h",
+  const jwt = await issueParticipantToken({
+    sessionId,
+    roomName,
+    createdAt: new Date().toISOString(),
+    participantIdentity,
+    participantName,
+    avatarStatus: "pending",
   });
-  token.addGrant({
-    roomJoin: true,
-    room: roomName,
-    canPublish: false,
-    canSubscribe: true,
-    canPublishData: true,
-  });
-
-  const jwt = await token.toJwt();
 
   try {
     const dispatch = new AgentDispatchClient(env.livekitUrl, env.livekitApiKey, env.livekitApiSecret);
@@ -116,7 +236,10 @@ export async function startFaceSession(
     roomName,
     createdAt: new Date().toISOString(),
     participantIdentity,
+    participantName,
+    avatarStatus: "pending",
   });
+  lastNewRoomAt = Date.now();
 
   return {
     ok: true,
@@ -125,6 +248,7 @@ export async function startFaceSession(
     token: jwt,
     livekitUrl: env.livekitUrl,
     avatarProvider: env.avatarProvider,
+    reused: false,
   };
 }
 

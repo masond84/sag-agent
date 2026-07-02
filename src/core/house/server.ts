@@ -22,6 +22,8 @@ import { isDevRunnerEnabled, queueManualDevTask } from "../dev/state.js";
 import {
   endFaceSession,
   getFaceSessionConfig,
+  getFaceSessionStatus,
+  setFaceSessionAvatarStatus,
   startFaceSession,
 } from "./livekit-session.js";
 import { buildAssistantReply } from "./assistant-reply.js";
@@ -49,9 +51,15 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
-function activityToHouseEvent(event: ActivityEvent): HouseEvent {
+function activityEventId(event: ActivityEvent, sequence?: number): string {
+  const digest = Buffer.from(event.summary, "utf8").toString("base64url").slice(0, 10);
+  const seq = sequence === undefined ? "" : `-${sequence}`;
+  return `act-${event.at}-${event.type}-${digest}${seq}`;
+}
+
+function activityToHouseEvent(event: ActivityEvent, sequence?: number): HouseEvent {
   return {
-    id: `act-${event.at}-${event.type}`,
+    id: activityEventId(event, sequence),
     at: event.at,
     kind: "activity",
     text: event.summary,
@@ -182,8 +190,9 @@ async function handleRequest(
     });
 
     const recent = await getRecentActivity({ limit: 15, sinceHours: 24 });
-    for (const item of recent.reverse()) {
-      send(activityToHouseEvent(item));
+    const ordered = [...recent].reverse();
+    for (const [index, item] of ordered.entries()) {
+      send(activityToHouseEvent(item, index));
     }
 
     const unsubscribe = subscribeHouseEvents(send);
@@ -206,16 +215,49 @@ async function handleRequest(
   if (path === "/face-session" && req.method === "POST") {
     const raw = await readBody(req);
     let participantName: string | undefined;
+    let forceNew = false;
     try {
-      const parsed = JSON.parse(raw || "{}") as { participantName?: string };
+      const parsed = JSON.parse(raw || "{}") as { participantName?: string; forceNew?: boolean };
       participantName = parsed.participantName;
+      forceNew = parsed.forceNew === true;
     } catch {
       sendJson(res, 400, { error: "Invalid JSON body" });
       return;
     }
 
-    const result = await startFaceSession({ participantName });
+    const result = await startFaceSession({ participantName, forceNew });
     sendJson(res, result.ok ? 200 : 503, result);
+    return;
+  }
+
+  const faceSessionStatusMatch = path.match(/^\/face-session\/([^/]+)\/status$/);
+  if (faceSessionStatusMatch && req.method === "GET") {
+    const sessionId = decodeURIComponent(faceSessionStatusMatch[1]!);
+    const status = getFaceSessionStatus(sessionId);
+    if (!status) {
+      sendJson(res, 404, { error: "Session not found" });
+      return;
+    }
+    sendJson(res, 200, status);
+    return;
+  }
+
+  const faceSessionAvatarStatusMatch = path.match(/^\/face-session\/([^/]+)\/avatar-status$/);
+  if (faceSessionAvatarStatusMatch && req.method === "POST") {
+    const sessionId = decodeURIComponent(faceSessionAvatarStatusMatch[1]!);
+    const raw = await readBody(req);
+    try {
+      const parsed = JSON.parse(raw || "{}") as { status?: string; error?: string };
+      const status = parsed.status?.trim();
+      if (status !== "pending" && status !== "ready" && status !== "error") {
+        sendJson(res, 400, { error: "Invalid status" });
+        return;
+      }
+      const result = setFaceSessionAvatarStatus(sessionId, status, parsed.error);
+      sendJson(res, result.ok ? 200 : 404, result);
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+    }
     return;
   }
 
