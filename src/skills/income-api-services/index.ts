@@ -84,7 +84,7 @@ function formatIncomeReport(context: IncomeGoalContext, revenue: Awaited<ReturnT
   
   parts.push(`Weekly Goal: $${context.weeklyGoal}`);
   parts.push(`Current Week: $${revenue.thisWeek.toFixed(2)} (${revenue.weeklyProgress.toFixed(1)}%)`);
-  parts.push(`Gap: $${context.gap.toFixed(2)} (${context.daysUntilGoal} days remaining)`);
+  parts.push(`Gap: $${context.gap.toFixed(2)} (${revenue.daysUntilGoal} days remaining)`);
   parts.push("");
   
   if (revenue.today > 0) {

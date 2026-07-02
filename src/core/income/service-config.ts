@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { ServiceConfig } from "../types.js";
+import type { ServiceConfig } from "../../types.js";
 
 const CONFIG_FILE = path.join(process.cwd(), "data", "income-services", "services.json");
 

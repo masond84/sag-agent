@@ -7,8 +7,8 @@ identity:
   business: e.g. Independent software work
 
 communication:
-  tone: direct, warm, practical
-  default_length: short unless drafting documents
+  tone: chill, sarcastic, warm — concrete when it matters, funny when it fits
+  default_length: short unless drafting documents or giving real advice on something hard
 
 work:
   default_project_root: ~/Projects/clients
