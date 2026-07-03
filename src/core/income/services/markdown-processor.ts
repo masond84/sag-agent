@@ -1,7 +1,7 @@
 import { marked } from "marked";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { ServiceUsage } from "../../../types.js";
-import { logServiceUsage } from "../revenue-tracking.js";
+import { logAndChargeServiceUsage } from "../revenue-tracking.js";
 import { getServiceConfig } from "../service-config.js";
 
 export interface MarkdownToPDFRequest {
@@ -74,7 +74,7 @@ export async function markdownToPDF(request: MarkdownToPDFRequest, customerId?: 
     const revenue = serviceConfig.pricing.pricePerCall || 0;
     const cost = serviceConfig.backend.costPerUnit || 0;
     
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "markdown-to-pdf",
       units: 1,
@@ -87,7 +87,7 @@ export async function markdownToPDF(request: MarkdownToPDFRequest, customerId?: 
     
     return Buffer.from(pdfBytes);
   } catch (error) {
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "markdown-to-pdf",
       units: 0,

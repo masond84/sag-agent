@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { logServiceUsage } from "../revenue-tracking.js";
+import { logAndChargeServiceUsage } from "../revenue-tracking.js";
 import { getServiceConfig } from "../service-config.js";
 
 export interface ImageOptimizeRequest {
@@ -51,7 +51,7 @@ export async function optimizeImage(
     const revenue = (serviceConfig.pricing.pricePerUnit ?? 0.01) * 1;
     const cost = serviceConfig.backend.costPerUnit ?? 0.0001;
 
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "image-optimize",
       units: 1,
@@ -69,7 +69,7 @@ export async function optimizeImage(
       height: result.info.height,
     };
   } catch (error) {
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "image-optimize",
       units: 0,

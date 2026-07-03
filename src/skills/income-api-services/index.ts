@@ -55,11 +55,19 @@ async function buildIncomeContext(): Promise<IncomeGoalContext> {
     });
   }
 
-  developmentPriorities.push({
-    task: "Add Stripe payment flow for API credits",
-    impact: "medium",
-    reason: "Enable paid customers to purchase API usage",
-  });
+  if (!process.env.STRIPE_SECRET_KEY?.trim()) {
+    developmentPriorities.push({
+      task: "Configure Stripe billing keys",
+      impact: "high",
+      reason: "Billing code is ready but STRIPE_SECRET_KEY is not set",
+    });
+  } else {
+    developmentPriorities.push({
+      task: "Launch marketing for paid API credits",
+      impact: "medium",
+      reason: "Stripe checkout is live — drive first paying customers",
+    });
+  }
   
   if (marketingNeeds.length === 0) {
     marketingNeeds.push("Continue SEO content generation (1 article/week)");

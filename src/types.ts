@@ -241,3 +241,29 @@ export interface IncomeGoalContext {
     reason: string;
   }>;
 }
+
+export interface CustomerRecord {
+  apiKey: string;
+  createdAt: string;
+  enabled: boolean;
+  creditsBalance: number;
+  stripeCustomerId?: string;
+  email?: string;
+  lastTopUpAt?: string;
+}
+
+export interface CreditPack {
+  id: string;
+  name: string;
+  description: string;
+  amountCents: number;
+  credits: number;
+}
+
+export interface BillingBalance {
+  customerId: string;
+  creditsBalance: number;
+  enabled: boolean;
+  createdAt: string;
+  lastTopUpAt?: string;
+}

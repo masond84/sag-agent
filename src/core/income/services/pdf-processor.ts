@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import type { ServiceUsage } from "../../../types.js";
-import { logServiceUsage } from "../revenue-tracking.js";
+import { logAndChargeServiceUsage } from "../revenue-tracking.js";
 import { getServiceConfig } from "../service-config.js";
 
 export interface PDFMergeRequest {
@@ -57,7 +57,7 @@ export async function mergePDFs(request: PDFMergeRequest, customerId?: string): 
     const revenue = totalPages * (serviceConfig.pricing.pricePerUnit || 0);
     const cost = totalPages * (serviceConfig.backend.costPerUnit || 0);
     
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "pdf-merge",
       units: totalPages,
@@ -70,7 +70,7 @@ export async function mergePDFs(request: PDFMergeRequest, customerId?: string): 
     
     return Buffer.from(result);
   } catch (error) {
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "pdf-merge",
       units: 0,
@@ -121,7 +121,7 @@ export async function splitPDF(request: PDFSplitRequest, customerId?: string): P
     const revenue = pagesToExtract.length * (serviceConfig.pricing.pricePerUnit || 0);
     const cost = pagesToExtract.length * (serviceConfig.backend.costPerUnit || 0);
     
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "pdf-split",
       units: pagesToExtract.length,
@@ -134,7 +134,7 @@ export async function splitPDF(request: PDFSplitRequest, customerId?: string): P
     
     return results;
   } catch (error) {
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "pdf-split",
       units: 0,
@@ -168,7 +168,7 @@ export async function compressPDF(request: PDFCompressRequest, customerId?: stri
     const revenue = serviceConfig.pricing.pricePerCall || 0;
     const cost = serviceConfig.backend.costPerUnit || 0;
     
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "pdf-compress",
       units: 1,
@@ -181,7 +181,7 @@ export async function compressPDF(request: PDFCompressRequest, customerId?: stri
     
     return Buffer.from(compressedBytes);
   } catch (error) {
-    await logServiceUsage({
+    await logAndChargeServiceUsage({
       timestamp: new Date().toISOString(),
       serviceId: "pdf-compress",
       units: 0,

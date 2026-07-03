@@ -1,14 +1,79 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { ServiceUsage, RevenueStats, ServiceStats } from "../../types.js";
+import type { BillingBalance, CustomerRecord, RevenueStats, ServiceStats, ServiceUsage } from "../../types.js";
 
 const DATA_DIR = path.join(process.cwd(), "data", "income-services");
 const USAGE_LOG = path.join(DATA_DIR, "usage.jsonl");
 const REVENUE_FILE = path.join(DATA_DIR, "revenue.json");
 const CUSTOMERS_FILE = path.join(DATA_DIR, "customers.json");
+const PAYMENTS_FILE = path.join(DATA_DIR, "payments.json");
+
+type CustomersStore = Record<string, CustomerRecord>;
+type PaymentsStore = Record<string, { customerId: string; credits: number; processedAt: string }>;
 
 async function ensureDataDir(): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
+}
+
+function normalizeCustomerRecord(record: Partial<CustomerRecord> & { apiKey: string }): CustomerRecord {
+  return {
+    apiKey: record.apiKey,
+    createdAt: record.createdAt ?? new Date().toISOString(),
+    enabled: record.enabled ?? true,
+    creditsBalance: record.creditsBalance ?? 0,
+    stripeCustomerId: record.stripeCustomerId,
+    email: record.email,
+    lastTopUpAt: record.lastTopUpAt,
+  };
+}
+
+async function readCustomers(): Promise<CustomersStore> {
+  await ensureDataDir();
+  try {
+    const content = await fs.readFile(CUSTOMERS_FILE, "utf-8");
+    const parsed = JSON.parse(content) as Record<string, Partial<CustomerRecord> & { apiKey: string }>;
+    const customers: CustomersStore = {};
+    for (const [customerId, record] of Object.entries(parsed)) {
+      customers[customerId] = normalizeCustomerRecord(record);
+    }
+    return customers;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+async function writeCustomers(customers: CustomersStore): Promise<void> {
+  await ensureDataDir();
+  await fs.writeFile(CUSTOMERS_FILE, JSON.stringify(customers, null, 2));
+}
+
+async function readPayments(): Promise<PaymentsStore> {
+  await ensureDataDir();
+  try {
+    const content = await fs.readFile(PAYMENTS_FILE, "utf-8");
+    return JSON.parse(content) as PaymentsStore;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+}
+
+async function writePayments(payments: PaymentsStore): Promise<void> {
+  await ensureDataDir();
+  await fs.writeFile(PAYMENTS_FILE, JSON.stringify(payments, null, 2));
+}
+
+function createApiKeyValue(): string {
+  return `sag_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
+
+function createCustomerId(): string {
+  return `cust_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
 }
 
 export async function logServiceUsage(usage: ServiceUsage): Promise<void> {
@@ -170,50 +235,190 @@ export async function getRecentFailures(limit = 10): Promise<ServiceUsage[]> {
   }
 }
 
-export async function generateAPIKey(customerId: string): Promise<string> {
-  await ensureDataDir();
-  
-  const key = `sag_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-  
-  let customers: Record<string, { apiKey: string; createdAt: string; enabled: boolean }> = {};
-  try {
-    const content = await fs.readFile(CUSTOMERS_FILE, "utf-8");
-    customers = JSON.parse(content);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-  
+export async function createCustomer(email?: string): Promise<string> {
+  const customers = await readCustomers();
+  const customerId = createCustomerId();
   customers[customerId] = {
-    apiKey: key,
+    apiKey: createApiKeyValue(),
     createdAt: new Date().toISOString(),
     enabled: true,
+    creditsBalance: 0,
+    email,
   };
-  
-  await fs.writeFile(CUSTOMERS_FILE, JSON.stringify(customers, null, 2));
-  
+  await writeCustomers(customers);
+  return customerId;
+}
+
+export async function ensureCustomer(customerId: string, email?: string): Promise<string> {
+  const customers = await readCustomers();
+  if (!customers[customerId]) {
+    customers[customerId] = {
+      apiKey: createApiKeyValue(),
+      createdAt: new Date().toISOString(),
+      enabled: true,
+      creditsBalance: 0,
+      email,
+    };
+    await writeCustomers(customers);
+  } else if (email && !customers[customerId].email) {
+    customers[customerId].email = email;
+    await writeCustomers(customers);
+  }
+  return customerId;
+}
+
+export async function getCustomer(customerId: string): Promise<CustomerRecord | undefined> {
+  const customers = await readCustomers();
+  return customers[customerId];
+}
+
+export async function getCustomerBalance(customerId: string): Promise<BillingBalance | undefined> {
+  const customer = await getCustomer(customerId);
+  if (!customer) {
+    return undefined;
+  }
+
+  return {
+    customerId,
+    creditsBalance: customer.creditsBalance,
+    enabled: customer.enabled,
+    createdAt: customer.createdAt,
+    lastTopUpAt: customer.lastTopUpAt,
+  };
+}
+
+export async function generateAPIKey(customerId: string): Promise<string> {
+  const customers = await readCustomers();
+  const existing = customers[customerId];
+  const key = createApiKeyValue();
+
+  customers[customerId] = normalizeCustomerRecord({
+    ...existing,
+    apiKey: key,
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+    enabled: true,
+    creditsBalance: existing?.creditsBalance ?? 0,
+    stripeCustomerId: existing?.stripeCustomerId,
+    email: existing?.email,
+    lastTopUpAt: existing?.lastTopUpAt,
+  });
+
+  await writeCustomers(customers);
   return key;
 }
 
+export async function getCustomerByApiKey(
+  key: string,
+): Promise<{ customerId: string; record: CustomerRecord } | undefined> {
+  const customers = await readCustomers();
+
+  for (const [customerId, customer] of Object.entries(customers)) {
+    if (customer.apiKey === key && customer.enabled) {
+      return { customerId, record: customer };
+    }
+  }
+
+  return undefined;
+}
+
 export async function validateAPIKey(key: string): Promise<boolean> {
-  await ensureDataDir();
-  
-  try {
-    const content = await fs.readFile(CUSTOMERS_FILE, "utf-8");
-    const customers = JSON.parse(content) as Record<string, { apiKey: string; enabled: boolean }>;
-    
-    for (const customer of Object.values(customers)) {
-      if (customer.apiKey === key && customer.enabled) {
-        return true;
-      }
-    }
-    
+  const customer = await getCustomerByApiKey(key);
+  return Boolean(customer);
+}
+
+export async function hasSufficientCredits(customerId: string, amount: number): Promise<boolean> {
+  const customer = await getCustomer(customerId);
+  if (!customer || !customer.enabled) {
     return false;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
-    }
-    throw error;
+  }
+  return customer.creditsBalance >= amount;
+}
+
+export async function deductCredits(customerId: string, amount: number): Promise<number> {
+  if (amount <= 0) {
+    const customer = await getCustomer(customerId);
+    return customer?.creditsBalance ?? 0;
+  }
+
+  const customers = await readCustomers();
+  const customer = customers[customerId];
+  if (!customer || !customer.enabled) {
+    throw new Error("Customer not found or disabled");
+  }
+
+  customer.creditsBalance = Math.max(0, customer.creditsBalance - amount);
+  customers[customerId] = customer;
+  await writeCustomers(customers);
+  return customer.creditsBalance;
+}
+
+export async function addCredits(
+  customerId: string,
+  amount: number,
+  paymentId: string,
+  options?: { stripeCustomerId?: string; email?: string },
+): Promise<{ creditsBalance: number; alreadyProcessed: boolean }> {
+  const payments = await readPayments();
+  if (payments[paymentId]) {
+    const customer = await getCustomer(customerId);
+    return {
+      creditsBalance: customer?.creditsBalance ?? 0,
+      alreadyProcessed: true,
+    };
+  }
+
+  const customers = await readCustomers();
+  let customer = customers[customerId];
+  if (!customer) {
+    customer = {
+      apiKey: createApiKeyValue(),
+      createdAt: new Date().toISOString(),
+      enabled: true,
+      creditsBalance: 0,
+      email: options?.email,
+    };
+    customers[customerId] = customer;
+  }
+
+  customer.creditsBalance += amount;
+  customer.lastTopUpAt = new Date().toISOString();
+  if (options?.stripeCustomerId) {
+    customer.stripeCustomerId = options.stripeCustomerId;
+  }
+  if (options?.email) {
+    customer.email = options.email;
+  }
+
+  customers[customerId] = customer;
+  payments[paymentId] = {
+    customerId,
+    credits: amount,
+    processedAt: new Date().toISOString(),
+  };
+
+  await writeCustomers(customers);
+  await writePayments(payments);
+
+  return {
+    creditsBalance: customer.creditsBalance,
+    alreadyProcessed: false,
+  };
+}
+
+export async function chargeCustomerForUsage(customerId: string, amount: number): Promise<void> {
+  if (amount <= 0) {
+    return;
+  }
+  await deductCredits(customerId, amount);
+}
+
+function isBillingActive(): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
+}
+
+export async function logAndChargeServiceUsage(usage: ServiceUsage): Promise<void> {
+  await logServiceUsage(usage);
+  if (usage.success && usage.customerId && usage.revenue > 0 && isBillingActive()) {
+    await chargeCustomerForUsage(usage.customerId, usage.revenue);
   }
 }

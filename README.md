@@ -166,12 +166,22 @@ Progress tracked in real-time. Agent prioritizes tasks that move towards this go
 
 ### Payment Processing
 
-Stripe integration for:
-- One-time payments (pay-per-use API calls)
-- Prepaid credits (API key accounts)
-- Subscription tiers (monthly service access)
+Stripe Checkout for prepaid API credits. When `STRIPE_SECRET_KEY` is set, all `/api/services/*` endpoints require an API key (`Authorization: Bearer <key>` or `X-API-Key` header). Credits are deducted per successful call based on service pricing.
 
-All payments tracked and reconciled automatically.
+**Billing endpoints** (House server):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/billing/packs` | List credit packs |
+| POST | `/api/billing/checkout` | Create Stripe Checkout session (`{ "packId": "starter" }`) |
+| POST | `/api/billing/webhook` | Stripe webhook (set `STRIPE_WEBHOOK_SECRET`) |
+| GET | `/api/billing/success?session_id=...` | Retrieve API key after payment |
+| GET | `/api/billing/balance` | Check credit balance (requires API key) |
+| POST | `/api/billing/keys/regenerate` | Rotate API key (requires API key) |
+
+Default credit packs: Starter ($10), Standard ($25), Pro ($100). Override with `STRIPE_CREDIT_PACKS` JSON in `.env`.
+
+Without Stripe keys configured, service endpoints remain open for local development.
 
 ### Data Storage
 
@@ -179,7 +189,8 @@ All payments tracked and reconciled automatically.
 data/income-services/
 ├── usage.jsonl          # Every API call logged
 ├── revenue.json         # Daily/weekly/monthly totals
-├── customers.json       # API key registry
+├── customers.json       # API key registry and credit balances
+├── payments.json        # Processed Stripe payment IDs (idempotency)
 ├── services.json        # Service configuration and pricing
 └── marketing-log.jsonl  # Content published, platforms, engagement
 ```
