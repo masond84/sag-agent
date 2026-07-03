@@ -28,10 +28,11 @@ import {
 } from "./livekit-session.js";
 import { buildAssistantReply } from "./assistant-reply.js";
 import type { InteractiveSkillContext } from "../../types.js";
-import { getRevenueStats, getServiceStats, validateAPIKey } from "../income/revenue-tracking.js";
+import { getRevenueStats, getServiceStats, getRecentFailures, validateAPIKey } from "../income/revenue-tracking.js";
 import { getEnabledServices } from "../income/service-config.js";
-import { mergePDFs, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
+import { mergePDFs, mergePDFsBatch, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
 import { markdownToPDF } from "../income/services/markdown-processor.js";
+import { optimizeImage } from "../income/services/image-processor.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 export type HouseInteractiveContextProvider = () => Promise<InteractiveSkillContext>;
@@ -365,15 +366,62 @@ async function handleRequest(
   }
 
   if (path === "/api/income/stats" && req.method === "GET") {
-    const stats = await getRevenueStats();
+    const weeklyGoal = Number(process.env.INCOME_WEEKLY_GOAL ?? 200);
+    const stats = await getRevenueStats(weeklyGoal);
     const serviceStats = await getServiceStats();
-    sendJson(res, 200, { revenue: stats, services: serviceStats });
+    const recentFailures = await getRecentFailures(5);
+    const enabledServices = await getEnabledServices();
+    sendJson(res, 200, {
+      revenue: stats,
+      services: serviceStats,
+      recentFailures,
+      enabledServices: enabledServices.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+      })),
+    });
     return;
   }
 
   if (path === "/api/income/services" && req.method === "GET") {
     const services = await getEnabledServices();
     sendJson(res, 200, { services });
+    return;
+  }
+
+  if (path === "/api/services/pdf/merge-batch" && req.method === "POST") {
+    const raw = await readBody(req);
+    let jobs: Array<{ files: string[]; metadata?: { title?: string; author?: string } }> = [];
+    let customerId: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        jobs: Array<{ files: string[]; metadata?: { title?: string; author?: string } }>;
+        customerId?: string;
+      };
+      jobs = parsed.jobs;
+      customerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    try {
+      const results = await mergePDFsBatch(
+        {
+          jobs: jobs.map((job) => ({
+            files: job.files.map((f) => Buffer.from(f, "base64")),
+            metadata: job.metadata,
+          })),
+        },
+        customerId,
+      );
+      sendJson(res, 200, { pdfs: results.map((r) => r.toString("base64")) });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
     return;
   }
 
@@ -405,20 +453,27 @@ async function handleRequest(
     const raw = await readBody(req);
     let file: Buffer;
     let pages: number[] | undefined;
+    let ranges: Array<{ start: number; end: number }> | undefined;
     let customerId: string | undefined;
-    
+
     try {
-      const parsed = JSON.parse(raw) as { file: string; pages?: number[]; customerId?: string };
+      const parsed = JSON.parse(raw) as {
+        file: string;
+        pages?: number[];
+        ranges?: Array<{ start: number; end: number }>;
+        customerId?: string;
+      };
       file = Buffer.from(parsed.file, "base64");
       pages = parsed.pages;
+      ranges = parsed.ranges;
       customerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
-    
+
     try {
-      const results = await splitPDF({ file, pages }, customerId);
+      const results = await splitPDF({ file, pages, ranges }, customerId);
       sendJson(res, 200, { pdfs: results.map(r => r.toString("base64")) });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -470,6 +525,53 @@ async function handleRequest(
     try {
       const result = await markdownToPDF({ markdown, options }, customerId);
       sendJson(res, 200, { pdf: result.toString("base64") });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/image/optimize" && req.method === "POST") {
+    const raw = await readBody(req);
+    let file: Buffer;
+    let format: "jpeg" | "png" | "webp" | undefined;
+    let quality: number | undefined;
+    let maxWidth: number | undefined;
+    let maxHeight: number | undefined;
+    let customerId: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        file: string;
+        format?: "jpeg" | "png" | "webp";
+        quality?: number;
+        maxWidth?: number;
+        maxHeight?: number;
+        customerId?: string;
+      };
+      file = Buffer.from(parsed.file, "base64");
+      format = parsed.format;
+      quality = parsed.quality;
+      maxWidth = parsed.maxWidth;
+      maxHeight = parsed.maxHeight;
+      customerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    try {
+      const result = await optimizeImage(
+        { file, format, quality, maxWidth, maxHeight },
+        customerId,
+      );
+      sendJson(res, 200, {
+        image: result.data.toString("base64"),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+      });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });

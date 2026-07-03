@@ -22,6 +22,10 @@ export interface PDFCompressRequest {
   quality?: "low" | "medium" | "high";
 }
 
+export interface PDFMergeBatchRequest {
+  jobs: PDFMergeRequest[];
+}
+
 export async function mergePDFs(request: PDFMergeRequest, customerId?: string): Promise<Buffer> {
   const startTime = Date.now();
   const serviceConfig = await getServiceConfig("pdf-merge");
@@ -92,8 +96,20 @@ export async function splitPDF(request: PDFSplitRequest, customerId?: string): P
     const pdf = await PDFDocument.load(request.file);
     const results: Buffer[] = [];
     
-    const pagesToExtract = request.pages || pdf.getPageIndices();
-    
+    let pagesToExtract: number[];
+    if (request.pages) {
+      pagesToExtract = request.pages;
+    } else if (request.ranges) {
+      pagesToExtract = [];
+      for (const range of request.ranges) {
+        for (let i = range.start; i <= range.end; i++) {
+          pagesToExtract.push(i);
+        }
+      }
+    } else {
+      pagesToExtract = [...pdf.getPageIndices()];
+    }
+
     for (const pageIndex of pagesToExtract) {
       const newPdf = await PDFDocument.create();
       const [copiedPage] = await newPdf.copyPages(pdf, [pageIndex]);
@@ -178,4 +194,22 @@ export async function compressPDF(request: PDFCompressRequest, customerId?: stri
     });
     throw error;
   }
+}
+
+export async function mergePDFsBatch(
+  request: PDFMergeBatchRequest,
+  customerId?: string,
+): Promise<Buffer[]> {
+  if (request.jobs.length === 0) {
+    throw new Error("At least one merge job is required");
+  }
+  if (request.jobs.length > 20) {
+    throw new Error("Batch limited to 20 merge jobs per request");
+  }
+
+  const results: Buffer[] = [];
+  for (const job of request.jobs) {
+    results.push(await mergePDFs(job, customerId));
+  }
+  return results;
 }

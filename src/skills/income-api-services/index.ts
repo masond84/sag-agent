@@ -49,16 +49,16 @@ async function buildIncomeContext(): Promise<IncomeGoalContext> {
   
   if (serviceStats.length < 3) {
     developmentPriorities.push({
-      task: "Implement image optimization service",
-      impact: "medium",
-      reason: "Need more service offerings to diversify revenue",
+      task: "Launch translation API (high-margin service)",
+      impact: "high",
+      reason: "Need more high-margin offerings to reach weekly goal",
     });
   }
-  
+
   developmentPriorities.push({
-    task: "Add batch processing endpoint for PDF merge",
+    task: "Add Stripe payment flow for API credits",
     impact: "medium",
-    reason: "Enable higher-value enterprise customers",
+    reason: "Enable paid customers to purchase API usage",
   });
   
   if (marketingNeeds.length === 0) {

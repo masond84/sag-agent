@@ -134,6 +134,50 @@ export interface ActivityEvent {
   meta?: Record<string, string | number | boolean>;
 }
 
+export interface IncomeRevenueStats {
+  today: number;
+  yesterday: number;
+  thisWeek: number;
+  lastWeek: number;
+  thisMonth: number;
+  lastMonth: number;
+  allTime: number;
+  weeklyGoal: number;
+  weeklyProgress: number;
+  daysUntilGoal: number;
+}
+
+export interface IncomeServiceStats {
+  serviceId: string;
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  totalRevenue: number;
+  totalCost: number;
+  totalProfit: number;
+  averageProfit: number;
+  lastUsed?: string;
+}
+
+export interface IncomeServiceFailure {
+  timestamp: string;
+  serviceId: string;
+  errorMessage?: string;
+}
+
+export interface IncomeEnabledService {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface IncomeStatsPayload {
+  revenue: IncomeRevenueStats;
+  services: IncomeServiceStats[];
+  recentFailures: IncomeServiceFailure[];
+  enabledServices: IncomeEnabledService[];
+}
+
 export type FaceState = "idle" | "listening" | "speaking" | "thinking";
 
 /** Monochrome accent palette — subtle blue-grey shifts per branch */
