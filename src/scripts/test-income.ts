@@ -59,6 +59,12 @@ async function main() {
   console.log("   curl -X POST http://localhost:9473/api/services/pdf/merge \\");
   console.log("     -H 'Content-Type: application/json' \\");
   console.log("     -d '{\"files\": [\"<base64-pdf>\"], \"customerId\": \"test\"}'");
+  console.log("   curl -X POST http://localhost:9473/api/services/pdf/merge-batch \\");
+  console.log("     -H 'Content-Type: application/json' \\");
+  console.log("     -d '{\"jobs\": [{\"files\": [\"<base64-pdf>\"]}], \"customerId\": \"test\"}'");
+  console.log("   curl -X POST http://localhost:9473/api/services/image/optimize \\");
+  console.log("     -H 'Content-Type: application/json' \\");
+  console.log("     -d '{\"file\": \"<base64-image>\", \"quality\": 80, \"customerId\": \"test\"}'");
   console.log("\n");
 }
 

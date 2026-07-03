@@ -12,6 +12,8 @@ export const SKILL_DESCRIPTIONS: Record<string, string> = {
   "telegram-commands": "This chat — answer questions, look up bills and focus, and run slash commands.",
   "morning-briefing": "Optional daily morning greeting at a configured time.",
   "dev-runner": "Autonomous code audit — Linear, Cursor Cloud, and auto-merge when enabled.",
+  "income-api-services":
+    "Operates API service businesses — monitors revenue vs $200/week goal, tracks service health, and reports dev priorities.",
 };
 
 export function describeSkill(skill: SkillSummary): string {

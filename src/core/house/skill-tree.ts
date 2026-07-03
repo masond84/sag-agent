@@ -284,6 +284,49 @@ const BRANCH_DEFS: BranchDef[] = [
       },
     ],
   },
+  {
+    id: "business",
+    name: "Business",
+    theme: "teal",
+    nodes: [
+      {
+        id: "biz-root",
+        label: "Revenue",
+        description: "API service business operator — tracks progress toward the $200/week income goal.",
+        x: 50,
+        y: 88,
+        requires: [],
+        skillId: "income-api-services",
+      },
+      {
+        id: "biz-pdf",
+        label: "PDF Tools",
+        description: "Merge, split, compress, and batch PDF processing via House server API endpoints.",
+        x: 28,
+        y: 58,
+        requires: ["biz-root"],
+        skillId: "income-api-services",
+      },
+      {
+        id: "biz-docs",
+        label: "Docs",
+        description: "Markdown-to-PDF conversion and document formatting services.",
+        x: 72,
+        y: 54,
+        requires: ["biz-root"],
+        skillId: "income-api-services",
+      },
+      {
+        id: "biz-image",
+        label: "Images",
+        description: "Web image optimization — resize, compress, and format conversion.",
+        x: 50,
+        y: 28,
+        requires: ["biz-pdf"],
+        skillId: "income-api-services",
+      },
+    ],
+  },
 ];
 
 export interface TreeNodeRef {

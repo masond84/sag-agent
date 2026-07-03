@@ -2,6 +2,7 @@ import type {
   ActivityEvent,
   DevStatusPayload,
   HouseEvent,
+  IncomeStatsPayload,
   RequestSkillBuildResult,
   SkillNodeDetail,
   SkillTreePayload,
@@ -74,6 +75,10 @@ export async function fetchActivity(limit = 30): Promise<ActivityEvent[]> {
 
 export async function fetchDevStatus(): Promise<DevStatusPayload | null> {
   return fetchWorkerJson<DevStatusPayload>("/dev/status");
+}
+
+export async function fetchIncomeStats(): Promise<IncomeStatsPayload | null> {
+  return fetchWorkerJson<IncomeStatsPayload>("/api/income/stats");
 }
 
 export async function requestSkillBuild(nodeId: string): Promise<RequestSkillBuildResult> {
