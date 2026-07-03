@@ -43,6 +43,18 @@ export function isBillingEnabled(): boolean {
   return Boolean(getStripeSecretKey());
 }
 
+export function getBillingConfigStatus(): {
+  secretKeyConfigured: boolean;
+  webhookSecretConfigured: boolean;
+  enabled: boolean;
+} {
+  return {
+    secretKeyConfigured: Boolean(getStripeSecretKey()),
+    webhookSecretConfigured: Boolean(getStripeWebhookSecret()),
+    enabled: isBillingEnabled(),
+  };
+}
+
 export function getBillingBaseUrl(): string {
   const configured = process.env.BILLING_BASE_URL?.trim();
   if (configured) {

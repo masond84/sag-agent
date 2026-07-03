@@ -35,6 +35,7 @@ import {
   createCheckoutSession,
   getCheckoutSuccess,
   getCreditPacks,
+  getBillingConfigStatus,
   handleStripeWebhook,
   isBillingEnabled,
 } from "../income/billing.js";
@@ -107,6 +108,42 @@ function activityToHouseEvent(event: ActivityEvent, sequence?: number): HouseEve
   };
 }
 
+async function handleBillingCheckout(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!isBillingEnabled()) {
+    sendJson(res, 503, { error: "Billing is not configured. Set STRIPE_SECRET_KEY in .env." });
+    return;
+  }
+
+  const raw = await readBody(req);
+  try {
+    const parsed = JSON.parse(raw) as {
+      packId?: string;
+      customerId?: string;
+      email?: string;
+      successUrl?: string;
+      cancelUrl?: string;
+    };
+
+    if (!parsed.packId?.trim()) {
+      sendJson(res, 400, { error: "packId is required" });
+      return;
+    }
+
+    const session = await createCheckoutSession({
+      packId: parsed.packId.trim(),
+      customerId: parsed.customerId?.trim(),
+      email: parsed.email?.trim(),
+      successUrl: parsed.successUrl?.trim(),
+      cancelUrl: parsed.cancelUrl?.trim(),
+    });
+
+    sendJson(res, 200, session);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    sendJson(res, 400, { error: detail });
+  }
+}
+
 async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -134,6 +171,7 @@ async function handleRequest(
       dryRun: context.dryRun,
       gmailConfigured: context.gmailConfigured,
       telegramConfigured: context.telegramConfigured,
+      billing: getBillingConfigStatus(),
       skills: context.skills,
     });
     return;
@@ -433,40 +471,11 @@ async function handleRequest(
     return;
   }
 
-  if (path === "/api/billing/checkout" && req.method === "POST") {
-    if (!isBillingEnabled()) {
-      sendJson(res, 503, { error: "Billing is not configured. Set STRIPE_SECRET_KEY in .env." });
-      return;
-    }
-
-    const raw = await readBody(req);
-    try {
-      const parsed = JSON.parse(raw) as {
-        packId?: string;
-        customerId?: string;
-        email?: string;
-        successUrl?: string;
-        cancelUrl?: string;
-      };
-
-      if (!parsed.packId?.trim()) {
-        sendJson(res, 400, { error: "packId is required" });
-        return;
-      }
-
-      const session = await createCheckoutSession({
-        packId: parsed.packId.trim(),
-        customerId: parsed.customerId?.trim(),
-        email: parsed.email?.trim(),
-        successUrl: parsed.successUrl?.trim(),
-        cancelUrl: parsed.cancelUrl?.trim(),
-      });
-
-      sendJson(res, 200, session);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      sendJson(res, 400, { error: detail });
-    }
+  if (
+    (path === "/api/billing/checkout" || path === "/api/billing/buy") &&
+    req.method === "POST"
+  ) {
+    await handleBillingCheckout(req, res);
     return;
   }
 

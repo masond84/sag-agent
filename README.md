@@ -125,6 +125,7 @@ Find your Telegram chat ID: `npm run telegram:chat-id`
 | `npm run mcp:gmail-auth` | One-time Gmail MCP OAuth (uses `data/gmail-mcp/`) |
 | `npm run house:build` | Production build for house/ |
 | `npm run test:income` | Preview income service status and revenue tracking |
+| `npm run test:billing` | Verify Stripe config and `/api/billing/buy` checkout (needs `STRIPE_SECRET_KEY`) |
 
 ## API Service Business
 
@@ -168,12 +169,15 @@ Progress tracked in real-time. Agent prioritizes tasks that move towards this go
 
 Stripe Checkout for prepaid API credits. When `STRIPE_SECRET_KEY` is set, all `/api/services/*` endpoints require an API key (`Authorization: Bearer <key>` or `X-API-Key` header). Credits are deducted per successful call based on service pricing.
 
+**Setup:** Copy keys into `.env` from [Stripe Dashboard](https://dashboard.stripe.com/test/apikeys) (`STRIPE_SECRET_KEY`) and [Webhooks](https://dashboard.stripe.com/test/webhooks) pointing at `http://localhost:9473/api/billing/webhook` with event `checkout.session.completed` (`STRIPE_WEBHOOK_SECRET`). Run `npm run test:billing` to verify checkout.
+
 **Billing endpoints** (House server):
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/billing/packs` | List credit packs |
-| POST | `/api/billing/checkout` | Create Stripe Checkout session (`{ "packId": "starter" }`) |
+| POST | `/api/billing/buy` | Create Stripe Checkout session (`{ "packId": "starter" }`) |
+| POST | `/api/billing/checkout` | Alias for `/api/billing/buy` |
 | POST | `/api/billing/webhook` | Stripe webhook (set `STRIPE_WEBHOOK_SECRET`) |
 | GET | `/api/billing/success?session_id=...` | Retrieve API key after payment |
 | GET | `/api/billing/balance` | Check credit balance (requires API key) |
