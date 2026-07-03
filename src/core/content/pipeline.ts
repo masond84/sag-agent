@@ -42,6 +42,45 @@ function applyManusResult(episode: ContentEpisode, result: ManusResult): Partial
   };
 }
 
+/** Resume episodes stuck in `planned` (e.g. after a restart mid-tick). */
+async function advancePlannedEpisodes(): Promise<PipelineEvent[]> {
+  const events: PipelineEvent[] = [];
+  const planned = (await listInFlightEpisodes()).filter((e) => e.status === "planned");
+
+  for (const episode of planned) {
+    const series = await getSeries(episode.seriesId);
+    if (!series) {
+      await updateEpisodeStatus(episode.id, "failed", { error: `Unknown series ${episode.seriesId}` });
+      continue;
+    }
+    try {
+      const generated = await generateEpisodeContent(series);
+      const updated = await updateEpisodeStatus(episode.id, "scripted", {
+        title: generated.title,
+        script: generated.script,
+        voiceoverNotes: generated.voiceoverNotes,
+        captions: generated.captions,
+      });
+      events.push({
+        type: "content_scripted",
+        summary: `Scripted: ${updated?.title ?? episode.title}`,
+        episode: updated ?? episode,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      const failed = await updateEpisodeStatus(episode.id, "failed", { error: detail });
+      events.push({
+        type: "content_failed",
+        summary: `Script failed: ${detail.slice(0, 120)}`,
+        episode: failed ?? episode,
+        notify: true,
+      });
+    }
+  }
+
+  return events;
+}
+
 /** Advance in-flight episodes (ingest Manus results). Returns events for notifications. */
 export async function advanceInFlightEpisodes(): Promise<PipelineEvent[]> {
   const events: PipelineEvent[] = [];
@@ -210,6 +249,7 @@ export async function runContentPipelineTick(): Promise<PipelineEvent[]> {
 
   const events: PipelineEvent[] = [];
   events.push(...(await advanceInFlightEpisodes()));
+  events.push(...(await advancePlannedEpisodes()));
   events.push(...(await advanceScriptedEpisodes()));
   events.push(...(await planAndScriptNewEpisode()));
   return events;
