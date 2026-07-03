@@ -28,8 +28,17 @@ import {
 } from "./livekit-session.js";
 import { buildAssistantReply } from "./assistant-reply.js";
 import type { InteractiveSkillContext } from "../../types.js";
-import { getRevenueStats, getServiceStats, getRecentFailures, validateAPIKey } from "../income/revenue-tracking.js";
+import { getRevenueStats, getServiceStats, getRecentFailures, getCustomerBalance, generateAPIKey } from "../income/revenue-tracking.js";
 import { getEnabledServices } from "../income/service-config.js";
+import { authenticateServiceRequest, requireCreditsForService } from "../income/api-auth.js";
+import {
+  createCheckoutSession,
+  getCheckoutSuccess,
+  getCreditPacks,
+  getBillingConfigStatus,
+  handleStripeWebhook,
+  isBillingEnabled,
+} from "../income/billing.js";
 import { mergePDFs, mergePDFsBatch, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
 import { markdownToPDF } from "../income/services/markdown-processor.js";
 import { optimizeImage } from "../income/services/image-processor.js";
@@ -56,6 +65,33 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+async function resolveServiceCustomer(
+  req: IncomingMessage,
+  bodyCustomerId?: string,
+): Promise<{ customerId?: string } | { error: string; status: number }> {
+  const auth = await authenticateServiceRequest(req);
+  if ("error" in auth) {
+    return auth;
+  }
+
+  if (auth.customerId) {
+    return { customerId: auth.customerId };
+  }
+
+  return { customerId: bodyCustomerId };
+}
+
+async function ensureServiceCredits(
+  customerId: string | undefined,
+  serviceId: string,
+): Promise<{ ok: true } | { error: string; status: number }> {
+  if (!customerId || !isBillingEnabled()) {
+    return { ok: true };
+  }
+
+  return requireCreditsForService(customerId, serviceId);
+}
+
 function activityEventId(event: ActivityEvent, sequence?: number): string {
   const digest = Buffer.from(event.summary, "utf8").toString("base64url").slice(0, 10);
   const seq = sequence === undefined ? "" : `-${sequence}`;
@@ -72,6 +108,42 @@ function activityToHouseEvent(event: ActivityEvent, sequence?: number): HouseEve
   };
 }
 
+async function handleBillingCheckout(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (!isBillingEnabled()) {
+    sendJson(res, 503, { error: "Billing is not configured. Set STRIPE_SECRET_KEY in .env." });
+    return;
+  }
+
+  const raw = await readBody(req);
+  try {
+    const parsed = JSON.parse(raw) as {
+      packId?: string;
+      customerId?: string;
+      email?: string;
+      successUrl?: string;
+      cancelUrl?: string;
+    };
+
+    if (!parsed.packId?.trim()) {
+      sendJson(res, 400, { error: "packId is required" });
+      return;
+    }
+
+    const session = await createCheckoutSession({
+      packId: parsed.packId.trim(),
+      customerId: parsed.customerId?.trim(),
+      email: parsed.email?.trim(),
+      successUrl: parsed.successUrl?.trim(),
+      cancelUrl: parsed.cancelUrl?.trim(),
+    });
+
+    sendJson(res, 200, session);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    sendJson(res, 400, { error: detail });
+  }
+}
+
 async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -85,7 +157,7 @@ async function handleRequest(
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key, Stripe-Signature",
     });
     res.end();
     return;
@@ -99,6 +171,7 @@ async function handleRequest(
       dryRun: context.dryRun,
       gmailConfigured: context.gmailConfigured,
       telegramConfigured: context.telegramConfigured,
+      billing: getBillingConfigStatus(),
       skills: context.skills,
     });
     return;
@@ -390,10 +463,101 @@ async function handleRequest(
     return;
   }
 
+  if (path === "/api/billing/packs" && req.method === "GET") {
+    sendJson(res, 200, {
+      billingEnabled: isBillingEnabled(),
+      packs: getCreditPacks(),
+    });
+    return;
+  }
+
+  if (
+    (path === "/api/billing/checkout" || path === "/api/billing/buy") &&
+    req.method === "POST"
+  ) {
+    await handleBillingCheckout(req, res);
+    return;
+  }
+
+  if (path === "/api/billing/webhook" && req.method === "POST") {
+    const raw = await readBody(req);
+    const signature = req.headers["stripe-signature"];
+    try {
+      const result = await handleStripeWebhook(
+        raw,
+        typeof signature === "string" ? signature : undefined,
+      );
+      sendJson(res, 200, { received: true, ...result });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/billing/success" && req.method === "GET") {
+    const sessionId = url.searchParams.get("session_id")?.trim();
+    if (!sessionId) {
+      sendJson(res, 400, { error: "session_id query parameter is required" });
+      return;
+    }
+
+    try {
+      const result = await getCheckoutSuccess(sessionId);
+      sendJson(res, 200, result);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/billing/cancel" && req.method === "GET") {
+    sendJson(res, 200, { cancelled: true });
+    return;
+  }
+
+  if (path === "/api/billing/balance" && req.method === "GET") {
+    const auth = await authenticateServiceRequest(req);
+    if ("error" in auth) {
+      sendJson(res, auth.status, { error: auth.error });
+      return;
+    }
+    if (!auth.customerId) {
+      sendJson(res, 401, { error: "API key required" });
+      return;
+    }
+
+    const balance = await getCustomerBalance(auth.customerId);
+    if (!balance) {
+      sendJson(res, 404, { error: "Customer not found" });
+      return;
+    }
+
+    sendJson(res, 200, balance);
+    return;
+  }
+
+  if (path === "/api/billing/keys/regenerate" && req.method === "POST") {
+    const auth = await authenticateServiceRequest(req);
+    if ("error" in auth) {
+      sendJson(res, auth.status, { error: auth.error });
+      return;
+    }
+    if (!auth.customerId) {
+      sendJson(res, 401, { error: "API key required" });
+      return;
+    }
+
+    const apiKey = await generateAPIKey(auth.customerId);
+    sendJson(res, 200, { customerId: auth.customerId, apiKey });
+    return;
+  }
+
   if (path === "/api/services/pdf/merge-batch" && req.method === "POST") {
     const raw = await readBody(req);
     let jobs: Array<{ files: string[]; metadata?: { title?: string; author?: string } }> = [];
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
 
     try {
       const parsed = JSON.parse(raw) as {
@@ -401,9 +565,21 @@ async function handleRequest(
         customerId?: string;
       };
       jobs = parsed.jobs;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "pdf-merge");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
       return;
     }
 
@@ -415,7 +591,7 @@ async function handleRequest(
             metadata: job.metadata,
           })),
         },
-        customerId,
+        resolved.customerId,
       );
       sendJson(res, 200, { pdfs: results.map((r) => r.toString("base64")) });
     } catch (error) {
@@ -428,19 +604,31 @@ async function handleRequest(
   if (path === "/api/services/pdf/merge" && req.method === "POST") {
     const raw = await readBody(req);
     let files: Buffer[] = [];
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
     
     try {
       const parsed = JSON.parse(raw) as { files: string[]; metadata?: { title?: string; author?: string }; customerId?: string };
       files = parsed.files.map(f => Buffer.from(f, "base64"));
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "pdf-merge");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
     
     try {
-      const result = await mergePDFs({ files }, customerId);
+      const result = await mergePDFs({ files }, resolved.customerId);
       sendJson(res, 200, { pdf: result.toString("base64") });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -454,7 +642,7 @@ async function handleRequest(
     let file: Buffer;
     let pages: number[] | undefined;
     let ranges: Array<{ start: number; end: number }> | undefined;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
 
     try {
       const parsed = JSON.parse(raw) as {
@@ -466,14 +654,26 @@ async function handleRequest(
       file = Buffer.from(parsed.file, "base64");
       pages = parsed.pages;
       ranges = parsed.ranges;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
 
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "pdf-split");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
+
     try {
-      const results = await splitPDF({ file, pages, ranges }, customerId);
+      const results = await splitPDF({ file, pages, ranges }, resolved.customerId);
       sendJson(res, 200, { pdfs: results.map(r => r.toString("base64")) });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -485,19 +685,31 @@ async function handleRequest(
   if (path === "/api/services/pdf/compress" && req.method === "POST") {
     const raw = await readBody(req);
     let file: Buffer;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
     
     try {
       const parsed = JSON.parse(raw) as { file: string; customerId?: string };
       file = Buffer.from(parsed.file, "base64");
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "pdf-compress");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
     
     try {
-      const result = await compressPDF({ file }, customerId);
+      const result = await compressPDF({ file }, resolved.customerId);
       sendJson(res, 200, { pdf: result.toString("base64") });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -510,20 +722,32 @@ async function handleRequest(
     const raw = await readBody(req);
     let markdown: string;
     let options: { title?: string; author?: string; fontSize?: number; pageSize?: "letter" | "a4" } | undefined;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
     
     try {
       const parsed = JSON.parse(raw) as { markdown: string; options?: typeof options; customerId?: string };
       markdown = parsed.markdown;
       options = parsed.options;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "markdown-to-pdf");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
     
     try {
-      const result = await markdownToPDF({ markdown, options }, customerId);
+      const result = await markdownToPDF({ markdown, options }, resolved.customerId);
       sendJson(res, 200, { pdf: result.toString("base64") });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -539,7 +763,7 @@ async function handleRequest(
     let quality: number | undefined;
     let maxWidth: number | undefined;
     let maxHeight: number | undefined;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
 
     try {
       const parsed = JSON.parse(raw) as {
@@ -555,16 +779,28 @@ async function handleRequest(
       quality = parsed.quality;
       maxWidth = parsed.maxWidth;
       maxHeight = parsed.maxHeight;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "image-optimize");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
       return;
     }
 
     try {
       const result = await optimizeImage(
         { file, format, quality, maxWidth, maxHeight },
-        customerId,
+        resolved.customerId,
       );
       sendJson(res, 200, {
         image: result.data.toString("base64"),

@@ -43,7 +43,8 @@
     "house:restart": "bash scripts/house-restart.sh",
     "face:agent": "tsx src/scripts/face-agent.ts",
     "sag:refresh": "bash scripts/sag-refresh.sh",
-    "test:income": "tsx src/scripts/test-income.ts"
+    "test:income": "tsx src/scripts/test-income.ts",
+    "test:billing": "tsx src/scripts/test-billing.ts"
   },
   "engines": {
     "node": ">=20"
