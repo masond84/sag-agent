@@ -35,10 +35,13 @@ export function IncomeDashboard() {
     );
   }
 
-  const { revenue, services, recentFailures, enabledServices } = stats;
+  const { revenue, services, recentFailures, enabledServices, streams } = stats;
   const gap = Math.max(0, revenue.weeklyGoal - revenue.thisWeek);
   const onTrack = revenue.weeklyProgress >= 100;
   const progressWidth = Math.min(100, revenue.weeklyProgress);
+  const streamLabel = streams
+    ? `API $${streams.api.thisWeek.toFixed(0)} · Content ${streams.content.draftsReady} drafts / ${streams.content.postedThisWeek} posted`
+    : `${enabledServices.length} services live`;
 
   return (
     <section className="space-y-4 rounded-lg border border-sag-border bg-white/[0.02] p-4">
@@ -46,8 +49,8 @@ export function IncomeDashboard() {
         <h2 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
           API business
         </h2>
-        <span className="text-[10px] uppercase tracking-wide text-sag-muted">
-          {enabledServices.length} services live
+        <span className="max-w-[58%] text-right text-[10px] uppercase tracking-wide text-sag-muted">
+          {streamLabel}
         </span>
       </div>
 

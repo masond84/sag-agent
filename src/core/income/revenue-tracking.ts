@@ -417,6 +417,17 @@ function isBillingActive(): boolean {
 }
 
 export async function logAndChargeServiceUsage(usage: ServiceUsage): Promise<void> {
+  // Public free-tier tries never count as revenue or debit credits.
+  if (usage.customerId === "free-tier") {
+    await logServiceUsage({
+      ...usage,
+      revenue: 0,
+      cost: 0,
+      profit: 0,
+    });
+    return;
+  }
+
   await logServiceUsage(usage);
   if (usage.success && usage.customerId && usage.revenue > 0 && isBillingActive()) {
     await chargeCustomerForUsage(usage.customerId, usage.revenue);

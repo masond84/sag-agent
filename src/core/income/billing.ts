@@ -125,7 +125,7 @@ export async function createCheckoutSession(
   const successUrl =
     request.successUrl?.trim() ||
     `${baseUrl}/api/billing/success?session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = request.cancelUrl?.trim() || `${baseUrl}/api/billing/cancel`;
+  const cancelUrl = request.cancelUrl?.trim() || `${baseUrl}/tools?cancelled=1`;
 
   const stripe = getStripeClient();
   const session = await stripe.checkout.sessions.create({

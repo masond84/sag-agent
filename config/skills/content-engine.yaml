@@ -1,0 +1,8 @@
+id: content-engine
+name: Content Engine
+enabled: true
+kind: scheduled
+goal: Produce narrated video drafts for YouTube, TikTok, and Reels
+description: |
+  Plans episodes, writes scripts and captions, queues Manus/Higgsfield packages,
+  and surfaces draft-ready content in Home Base. Does not auto-post.

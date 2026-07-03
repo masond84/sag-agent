@@ -14,6 +14,8 @@ export const SKILL_DESCRIPTIONS: Record<string, string> = {
   "dev-runner": "Autonomous code audit — Linear, Cursor Cloud, and auto-merge when enabled.",
   "income-api-services":
     "Operates API service businesses — monitors revenue vs $200/week goal, tracks service health, and reports dev priorities.",
+  "content-engine":
+    "Content factory — scripts, captions, Manus/Higgsfield packages, and draft-ready episodes in Home Base (no auto-post).",
 };
 
 export function describeSkill(skill: SkillSummary): string {

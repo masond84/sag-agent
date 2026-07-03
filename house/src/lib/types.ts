@@ -171,11 +171,87 @@ export interface IncomeEnabledService {
   description: string;
 }
 
+export interface ContentStreamStats {
+  draftsReady: number;
+  postedThisWeek: number;
+  inFlight: number;
+  failed: number;
+}
+
+export interface ApiStreamStats {
+  thisWeek: number;
+  weeklyGoal: number;
+  weeklyProgress: number;
+  servicesLive: number;
+  stripeConfigured: boolean;
+}
+
+export interface ContentStatsPayload {
+  byStatus: Record<string, number>;
+  draftsReady: number;
+  inFlight: number;
+  postedThisWeek: number;
+  failed: number;
+  total: number;
+  seriesCount: number;
+}
+
+export type ContentPlatform = "youtube" | "tiktok" | "reels";
+
+export type EpisodeStatus =
+  | "planned"
+  | "scripted"
+  | "manus_queued"
+  | "rendering"
+  | "draft_ready"
+  | "posted"
+  | "failed";
+
+export interface ClipCaptions {
+  youtube: string;
+  tiktok: string;
+  reels: string;
+  hashtags: string[];
+}
+
+export interface EpisodeAssets {
+  videoPath?: string;
+  videoUrl?: string;
+  voiceoverPath?: string;
+  voiceoverUrl?: string;
+  thumbnailPath?: string;
+  durationSeconds?: number;
+  notes?: string;
+}
+
+export interface ContentEpisode {
+  id: string;
+  seriesId: string;
+  title: string;
+  status: EpisodeStatus;
+  script?: string;
+  voiceoverNotes?: string;
+  captions?: ClipCaptions;
+  assets?: EpisodeAssets;
+  manusJobId?: string;
+  manusPackagePath?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+  postedAt?: string;
+  platformsPosted: ContentPlatform[];
+}
+
 export interface IncomeStatsPayload {
   revenue: IncomeRevenueStats;
   services: IncomeServiceStats[];
   recentFailures: IncomeServiceFailure[];
   enabledServices: IncomeEnabledService[];
+  content?: ContentStatsPayload;
+  streams?: {
+    api: ApiStreamStats;
+    content: ContentStreamStats;
+  };
 }
 
 export type FaceState = "idle" | "listening" | "speaking" | "thinking";

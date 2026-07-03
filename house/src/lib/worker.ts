@@ -1,5 +1,8 @@
 import type {
   ActivityEvent,
+  ContentEpisode,
+  ContentPlatform,
+  ContentStatsPayload,
   DevStatusPayload,
   HouseEvent,
   IncomeStatsPayload,
@@ -79,6 +82,39 @@ export async function fetchDevStatus(): Promise<DevStatusPayload | null> {
 
 export async function fetchIncomeStats(): Promise<IncomeStatsPayload | null> {
   return fetchWorkerJson<IncomeStatsPayload>("/api/income/stats");
+}
+
+export async function fetchContentStats(): Promise<ContentStatsPayload | null> {
+  return fetchWorkerJson<ContentStatsPayload>("/api/content/stats");
+}
+
+export async function fetchContentEpisodes(limit = 20): Promise<ContentEpisode[]> {
+  const payload = await fetchWorkerJson<{ episodes: ContentEpisode[] }>(
+    `/api/content/episodes?limit=${limit}`,
+  );
+  return payload?.episodes ?? [];
+}
+
+export async function markContentPosted(
+  episodeId: string,
+  platforms: ContentPlatform[],
+): Promise<ContentEpisode | null> {
+  try {
+    const response = await fetch(
+      `${getFetchBase()}/api/content/episodes/${encodeURIComponent(episodeId)}/posted`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platforms }),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { episode: ContentEpisode };
+    return payload.episode;
+  } catch {
+    return null;
+  }
 }
 
 export async function requestSkillBuild(nodeId: string): Promise<RequestSkillBuildResult> {

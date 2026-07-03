@@ -44,7 +44,8 @@
     "face:agent": "tsx src/scripts/face-agent.ts",
     "sag:refresh": "bash scripts/sag-refresh.sh",
     "test:income": "tsx src/scripts/test-income.ts",
-    "test:billing": "tsx src/scripts/test-billing.ts"
+    "test:billing": "tsx src/scripts/test-billing.ts",
+    "test:content": "tsx src/scripts/test-content.ts"
   },
   "engines": {
     "node": ">=20"

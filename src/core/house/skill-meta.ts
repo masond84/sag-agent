@@ -62,6 +62,23 @@ export const SKILL_META: Record<string, SkillMeta> = {
     ],
     critical: true,
   },
+  "income-api-services": {
+    implementationPath: "src/skills/income-api-services/index.ts",
+    activityTypes: ["income_check"],
+    telegramCommands: [],
+  },
+  "content-engine": {
+    implementationPath: "src/skills/content-engine/index.ts",
+    activityTypes: [
+      "content_planned",
+      "content_scripted",
+      "content_manus_queued",
+      "content_draft_ready",
+      "content_posted",
+      "content_failed",
+    ],
+    telegramCommands: [],
+  },
 };
 
 export function getSkillMeta(skillId: string): SkillMeta | undefined {
