@@ -55,16 +55,20 @@ async function main() {
   console.log("\n=== NEXT STEPS ===\n");
   console.log("1. Set HOUSE_SERVER_ENABLED=true in .env");
   console.log("2. Run: npm run dev");
-  console.log("3. Test API endpoint:");
+  console.log("3. Grant dev credits (DRY_RUN=true):");
+  console.log("   curl -X POST http://localhost:9473/api/billing/dev/grant-credits \\");
+  console.log("     -H 'Content-Type: application/json' \\");
+  console.log("     -d '{\"amountUsd\": 10}'");
+  console.log("4. Test API endpoint with your API key:");
   console.log("   curl -X POST http://localhost:9473/api/services/pdf/merge \\");
   console.log("     -H 'Content-Type: application/json' \\");
-  console.log("     -d '{\"files\": [\"<base64-pdf>\"], \"customerId\": \"test\"}'");
-  console.log("   curl -X POST http://localhost:9473/api/services/pdf/merge-batch \\");
+  console.log("     -H 'Authorization: Bearer <your-api-key>' \\");
+  console.log("     -d '{\"files\": [\"<base64-pdf>\"]}'");
+  console.log("5. For live payments, set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET, then:");
+  console.log("   curl http://localhost:9473/api/billing/packages");
+  console.log("   curl -X POST http://localhost:9473/api/billing/checkout \\");
   console.log("     -H 'Content-Type: application/json' \\");
-  console.log("     -d '{\"jobs\": [{\"files\": [\"<base64-pdf>\"]}], \"customerId\": \"test\"}'");
-  console.log("   curl -X POST http://localhost:9473/api/services/image/optimize \\");
-  console.log("     -H 'Content-Type: application/json' \\");
-  console.log("     -d '{\"file\": \"<base64-image>\", \"quality\": 80, \"customerId\": \"test\"}'");
+  console.log("     -d '{\"packageId\": \"starter\", \"email\": \"you@example.com\"}'");
   console.log("\n");
 }
 

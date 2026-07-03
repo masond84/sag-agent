@@ -1,20 +1,47 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { ServiceUsage, RevenueStats, ServiceStats } from "../../types.js";
+import { debitCredits } from "./customers.js";
+
+export {
+  addCredits,
+  createCustomer,
+  debitCredits,
+  ensureCustomerApiKey,
+  ensureMinimumCredits,
+  findCustomerByApiKey,
+  generateAPIKey,
+  getCustomer,
+  grantTestCredits,
+  InsufficientCreditsError,
+  validateAPIKey,
+} from "./customers.js";
 
 const DATA_DIR = path.join(process.cwd(), "data", "income-services");
 const USAGE_LOG = path.join(DATA_DIR, "usage.jsonl");
-const REVENUE_FILE = path.join(DATA_DIR, "revenue.json");
-const CUSTOMERS_FILE = path.join(DATA_DIR, "customers.json");
 
 async function ensureDataDir(): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
+}
+
+function shouldDebitCredits(): boolean {
+  if (process.env.INCOME_DEBIT_CREDITS === "false") {
+    return false;
+  }
+  if (process.env.INCOME_DEBIT_CREDITS === "true") {
+    return true;
+  }
+  return Boolean(process.env.STRIPE_SECRET_KEY) || process.env.INCOME_API_KEY_REQUIRED === "true";
 }
 
 export async function logServiceUsage(usage: ServiceUsage): Promise<void> {
   await ensureDataDir();
   const line = JSON.stringify(usage) + "\n";
   await fs.appendFile(USAGE_LOG, line, "utf-8");
+
+  if (usage.success && usage.customerId && usage.revenue > 0 && shouldDebitCredits()) {
+    await debitCredits(usage.customerId, usage.revenue);
+  }
 }
 
 export async function getRevenueStats(weeklyGoal = 200): Promise<RevenueStats> {
@@ -165,54 +192,6 @@ export async function getRecentFailures(limit = 10): Promise<ServiceUsage[]> {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return [];
-    }
-    throw error;
-  }
-}
-
-export async function generateAPIKey(customerId: string): Promise<string> {
-  await ensureDataDir();
-  
-  const key = `sag_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-  
-  let customers: Record<string, { apiKey: string; createdAt: string; enabled: boolean }> = {};
-  try {
-    const content = await fs.readFile(CUSTOMERS_FILE, "utf-8");
-    customers = JSON.parse(content);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-  
-  customers[customerId] = {
-    apiKey: key,
-    createdAt: new Date().toISOString(),
-    enabled: true,
-  };
-  
-  await fs.writeFile(CUSTOMERS_FILE, JSON.stringify(customers, null, 2));
-  
-  return key;
-}
-
-export async function validateAPIKey(key: string): Promise<boolean> {
-  await ensureDataDir();
-  
-  try {
-    const content = await fs.readFile(CUSTOMERS_FILE, "utf-8");
-    const customers = JSON.parse(content) as Record<string, { apiKey: string; enabled: boolean }>;
-    
-    for (const customer of Object.values(customers)) {
-      if (customer.apiKey === key && customer.enabled) {
-        return true;
-      }
-    }
-    
-    return false;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
     }
     throw error;
   }

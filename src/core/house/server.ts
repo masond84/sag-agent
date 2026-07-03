@@ -28,11 +28,24 @@ import {
 } from "./livekit-session.js";
 import { buildAssistantReply } from "./assistant-reply.js";
 import type { InteractiveSkillContext } from "../../types.js";
-import { getRevenueStats, getServiceStats, getRecentFailures, validateAPIKey } from "../income/revenue-tracking.js";
+import { getRevenueStats, getServiceStats, getRecentFailures } from "../income/revenue-tracking.js";
 import { getEnabledServices } from "../income/service-config.js";
 import { mergePDFs, mergePDFsBatch, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
 import { markdownToPDF } from "../income/services/markdown-processor.js";
 import { optimizeImage } from "../income/services/image-processor.js";
+import {
+  authenticateRequest,
+  isIncomeApiKeyRequired,
+  type AuthenticatedCustomer,
+} from "../income/api-auth.js";
+import {
+  createCreditCheckoutSession,
+  getCheckoutSessionStatus,
+  handleStripeWebhook,
+  isStripeConfigured,
+  listCreditPackages,
+} from "../income/stripe-billing.js";
+import { InsufficientCreditsError, createCustomer, ensureMinimumCredits, grantTestCredits } from "../income/customers.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 export type HouseInteractiveContextProvider = () => Promise<InteractiveSkillContext>;
@@ -54,6 +67,56 @@ function readBody(req: IncomingMessage): Promise<string> {
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
   });
+}
+
+async function resolveServiceCustomer(
+  req: IncomingMessage,
+  bodyCustomerId?: string,
+): Promise<{ customerId?: string; auth?: AuthenticatedCustomer; error?: { status: number; message: string } }> {
+  const auth = await authenticateRequest(req);
+
+  if (isIncomeApiKeyRequired()) {
+    if (!auth) {
+      return {
+        error: {
+          status: 401,
+          message: "Missing or invalid API key. Use Authorization: Bearer sag_... or X-API-Key header.",
+        },
+      };
+    }
+
+    try {
+      await ensureMinimumCredits(auth.customerId);
+    } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        return { error: { status: 402, message: error.message } };
+      }
+      throw error;
+    }
+
+    return { customerId: auth.customerId, auth };
+  }
+
+  if (auth) {
+    try {
+      await ensureMinimumCredits(auth.customerId);
+    } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        return { error: { status: 402, message: error.message } };
+      }
+      throw error;
+    }
+    return { customerId: auth.customerId, auth };
+  }
+
+  return { customerId: bodyCustomerId };
+}
+
+function billingErrorResponse(
+  res: ServerResponse,
+  error: { status: number; message: string },
+): void {
+  sendJson(res, error.status, { error: error.message });
 }
 
 function activityEventId(event: ActivityEvent, sequence?: number): string {
@@ -85,7 +148,7 @@ async function handleRequest(
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key, Stripe-Signature",
     });
     res.end();
     return;
@@ -390,10 +453,153 @@ async function handleRequest(
     return;
   }
 
+  if (path === "/api/billing/packages" && req.method === "GET") {
+    sendJson(res, 200, {
+      packages: listCreditPackages(),
+      stripeConfigured: isStripeConfigured(),
+      apiKeyRequired: isIncomeApiKeyRequired(),
+    });
+    return;
+  }
+
+  if (path === "/api/billing/checkout" && req.method === "POST") {
+    if (!isStripeConfigured()) {
+      sendJson(res, 503, { error: "Stripe is not configured. Set STRIPE_SECRET_KEY in .env" });
+      return;
+    }
+
+    const raw = await readBody(req);
+    let packageId = "";
+    let email: string | undefined;
+    let customerId: string | undefined;
+    let successUrl: string | undefined;
+    let cancelUrl: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        packageId?: string;
+        email?: string;
+        customerId?: string;
+        successUrl?: string;
+        cancelUrl?: string;
+      };
+      packageId = parsed.packageId ?? "";
+      email = parsed.email;
+      customerId = parsed.customerId;
+      successUrl = parsed.successUrl;
+      cancelUrl = parsed.cancelUrl;
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    if (!packageId) {
+      sendJson(res, 400, { error: "Missing packageId" });
+      return;
+    }
+
+    try {
+      const checkout = await createCreditCheckoutSession({
+        packageId,
+        email,
+        customerId,
+        successUrl,
+        cancelUrl,
+      });
+      sendJson(res, 200, checkout);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
+  const billingSessionMatch = path.match(/^\/api\/billing\/session\/([^/]+)$/);
+  if (billingSessionMatch && req.method === "GET") {
+    if (!isStripeConfigured()) {
+      sendJson(res, 503, { error: "Stripe is not configured. Set STRIPE_SECRET_KEY in .env" });
+      return;
+    }
+
+    const sessionId = decodeURIComponent(billingSessionMatch[1]!);
+    try {
+      const status = await getCheckoutSessionStatus(sessionId);
+      sendJson(res, 200, status);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/billing/account" && req.method === "GET") {
+    const auth = await authenticateRequest(req);
+    if (!auth) {
+      sendJson(res, 401, { error: "Missing or invalid API key" });
+      return;
+    }
+
+    sendJson(res, 200, {
+      customerId: auth.customerId,
+      creditsBalance: auth.creditsBalance,
+      email: auth.email,
+      apiKeyPrefix: `${auth.apiKey.slice(0, 12)}...`,
+    });
+    return;
+  }
+
+  if (path === "/api/billing/dev/grant-credits" && req.method === "POST") {
+    if (process.env.DRY_RUN !== "true") {
+      sendJson(res, 403, { error: "Dev credit grants are only available when DRY_RUN=true" });
+      return;
+    }
+
+    const raw = await readBody(req);
+    let amountUsd = 10;
+    let email: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw || "{}") as { amountUsd?: number; email?: string };
+      amountUsd = Number(parsed.amountUsd ?? 10);
+      email = parsed.email;
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+
+    if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+      sendJson(res, 400, { error: "amountUsd must be a positive number" });
+      return;
+    }
+
+    const { customerId, apiKey } = await createCustomer({ email, withApiKey: true });
+    const customer = await grantTestCredits(customerId, amountUsd);
+    sendJson(res, 200, {
+      customerId,
+      apiKey,
+      creditsBalance: customer.creditsBalance,
+      message: "Dev credits granted. Use the API key in Authorization or X-API-Key headers.",
+    });
+    return;
+  }
+
+  if (path === "/api/stripe/webhook" && req.method === "POST") {
+    const raw = await readBody(req);
+    const signature = req.headers["stripe-signature"];
+    try {
+      await handleStripeWebhook(raw, typeof signature === "string" ? signature : undefined);
+      sendJson(res, 200, { received: true });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 400, { error: detail });
+    }
+    return;
+  }
+
   if (path === "/api/services/pdf/merge-batch" && req.method === "POST") {
     const raw = await readBody(req);
     let jobs: Array<{ files: string[]; metadata?: { title?: string; author?: string } }> = [];
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
 
     try {
       const parsed = JSON.parse(raw) as {
@@ -401,9 +607,15 @@ async function handleRequest(
         customerId?: string;
       };
       jobs = parsed.jobs;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    const customer = await resolveServiceCustomer(req, bodyCustomerId);
+    if (customer.error) {
+      billingErrorResponse(res, customer.error);
       return;
     }
 
@@ -415,10 +627,19 @@ async function handleRequest(
             metadata: job.metadata,
           })),
         },
-        customerId,
+        customer.customerId,
       );
-      sendJson(res, 200, { pdfs: results.map((r) => r.toString("base64")) });
+      sendJson(res, 200, {
+        pdfs: results.map((r) => r.toString("base64")),
+        creditsBalance: customer.auth?.customerId
+          ? (await authenticateRequest(req))?.creditsBalance
+          : undefined,
+      });
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        billingErrorResponse(res, { status: 402, message: error.message });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });
     }
@@ -428,21 +649,35 @@ async function handleRequest(
   if (path === "/api/services/pdf/merge" && req.method === "POST") {
     const raw = await readBody(req);
     let files: Buffer[] = [];
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
     
     try {
       const parsed = JSON.parse(raw) as { files: string[]; metadata?: { title?: string; author?: string }; customerId?: string };
       files = parsed.files.map(f => Buffer.from(f, "base64"));
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
+
+    const customer = await resolveServiceCustomer(req, bodyCustomerId);
+    if (customer.error) {
+      billingErrorResponse(res, customer.error);
+      return;
+    }
     
     try {
-      const result = await mergePDFs({ files }, customerId);
-      sendJson(res, 200, { pdf: result.toString("base64") });
+      const result = await mergePDFs({ files }, customer.customerId);
+      const auth = customer.auth ? await authenticateRequest(req) : null;
+      sendJson(res, 200, {
+        pdf: result.toString("base64"),
+        creditsBalance: auth?.creditsBalance,
+      });
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        billingErrorResponse(res, { status: 402, message: error.message });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });
     }
@@ -454,7 +689,7 @@ async function handleRequest(
     let file: Buffer;
     let pages: number[] | undefined;
     let ranges: Array<{ start: number; end: number }> | undefined;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
 
     try {
       const parsed = JSON.parse(raw) as {
@@ -466,16 +701,30 @@ async function handleRequest(
       file = Buffer.from(parsed.file, "base64");
       pages = parsed.pages;
       ranges = parsed.ranges;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
 
+    const customer = await resolveServiceCustomer(req, bodyCustomerId);
+    if (customer.error) {
+      billingErrorResponse(res, customer.error);
+      return;
+    }
+
     try {
-      const results = await splitPDF({ file, pages, ranges }, customerId);
-      sendJson(res, 200, { pdfs: results.map(r => r.toString("base64")) });
+      const results = await splitPDF({ file, pages, ranges }, customer.customerId);
+      const auth = customer.auth ? await authenticateRequest(req) : null;
+      sendJson(res, 200, {
+        pdfs: results.map(r => r.toString("base64")),
+        creditsBalance: auth?.creditsBalance,
+      });
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        billingErrorResponse(res, { status: 402, message: error.message });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });
     }
@@ -485,21 +734,35 @@ async function handleRequest(
   if (path === "/api/services/pdf/compress" && req.method === "POST") {
     const raw = await readBody(req);
     let file: Buffer;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
     
     try {
       const parsed = JSON.parse(raw) as { file: string; customerId?: string };
       file = Buffer.from(parsed.file, "base64");
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
+
+    const customer = await resolveServiceCustomer(req, bodyCustomerId);
+    if (customer.error) {
+      billingErrorResponse(res, customer.error);
+      return;
+    }
     
     try {
-      const result = await compressPDF({ file }, customerId);
-      sendJson(res, 200, { pdf: result.toString("base64") });
+      const result = await compressPDF({ file }, customer.customerId);
+      const auth = customer.auth ? await authenticateRequest(req) : null;
+      sendJson(res, 200, {
+        pdf: result.toString("base64"),
+        creditsBalance: auth?.creditsBalance,
+      });
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        billingErrorResponse(res, { status: 402, message: error.message });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });
     }
@@ -510,22 +773,36 @@ async function handleRequest(
     const raw = await readBody(req);
     let markdown: string;
     let options: { title?: string; author?: string; fontSize?: number; pageSize?: "letter" | "a4" } | undefined;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
     
     try {
       const parsed = JSON.parse(raw) as { markdown: string; options?: typeof options; customerId?: string };
       markdown = parsed.markdown;
       options = parsed.options;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
       return;
     }
+
+    const customer = await resolveServiceCustomer(req, bodyCustomerId);
+    if (customer.error) {
+      billingErrorResponse(res, customer.error);
+      return;
+    }
     
     try {
-      const result = await markdownToPDF({ markdown, options }, customerId);
-      sendJson(res, 200, { pdf: result.toString("base64") });
+      const result = await markdownToPDF({ markdown, options }, customer.customerId);
+      const auth = customer.auth ? await authenticateRequest(req) : null;
+      sendJson(res, 200, {
+        pdf: result.toString("base64"),
+        creditsBalance: auth?.creditsBalance,
+      });
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        billingErrorResponse(res, { status: 402, message: error.message });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });
     }
@@ -539,7 +816,7 @@ async function handleRequest(
     let quality: number | undefined;
     let maxWidth: number | undefined;
     let maxHeight: number | undefined;
-    let customerId: string | undefined;
+    let bodyCustomerId: string | undefined;
 
     try {
       const parsed = JSON.parse(raw) as {
@@ -555,24 +832,36 @@ async function handleRequest(
       quality = parsed.quality;
       maxWidth = parsed.maxWidth;
       maxHeight = parsed.maxHeight;
-      customerId = parsed.customerId;
+      bodyCustomerId = parsed.customerId;
     } catch {
       sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    const customer = await resolveServiceCustomer(req, bodyCustomerId);
+    if (customer.error) {
+      billingErrorResponse(res, customer.error);
       return;
     }
 
     try {
       const result = await optimizeImage(
         { file, format, quality, maxWidth, maxHeight },
-        customerId,
+        customer.customerId,
       );
+      const auth = customer.auth ? await authenticateRequest(req) : null;
       sendJson(res, 200, {
         image: result.data.toString("base64"),
         format: result.format,
         width: result.width,
         height: result.height,
+        creditsBalance: auth?.creditsBalance,
       });
     } catch (error) {
+      if (error instanceof InsufficientCreditsError) {
+        billingErrorResponse(res, { status: 402, message: error.message });
+        return;
+      }
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });
     }

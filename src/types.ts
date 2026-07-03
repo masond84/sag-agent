@@ -228,6 +228,25 @@ export interface ServiceStats {
   lastUsed?: string;
 }
 
+export interface CreditPackage {
+  id: string;
+  name: string;
+  description: string;
+  priceUsd: number;
+  creditsUsd: number;
+}
+
+export interface CustomerRecord {
+  apiKey: string;
+  createdAt: string;
+  enabled: boolean;
+  email?: string;
+  creditsBalance: number;
+  totalPurchased: number;
+  stripeCustomerId?: string;
+  lastPurchaseAt?: string;
+}
+
 export interface IncomeGoalContext {
   weeklyGoal: number;
   currentWeekRevenue: number;

@@ -166,12 +166,26 @@ Progress tracked in real-time. Agent prioritizes tasks that move towards this go
 
 ### Payment Processing
 
-Stripe integration for:
-- One-time payments (pay-per-use API calls)
-- Prepaid credits (API key accounts)
-- Subscription tiers (monthly service access)
+Stripe checkout for prepaid API credits:
 
-All payments tracked and reconciled automatically.
+1. **Browse packages** — `GET /api/billing/packages` (Starter $10, Growth $50, Pro $100)
+2. **Checkout** — `POST /api/billing/checkout` with `{ "packageId": "starter", "email": "you@example.com" }` returns a Stripe Checkout URL
+3. **Webhook** — `POST /api/stripe/webhook` credits the customer account on `checkout.session.completed`
+4. **Retrieve key** — `GET /api/billing/session/:sessionId` returns the API key after payment
+5. **Use services** — Pass `Authorization: Bearer sag_...` or `X-API-Key: sag_...` on `/api/services/*` calls; credits debit automatically
+
+For local testing without Stripe, set `DRY_RUN=true` and call `POST /api/billing/dev/grant-credits` to create a customer with credits and an API key.
+
+Configure in `.env`:
+
+```bash
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+INCOME_PUBLIC_BASE_URL=https://your-public-api-host
+# INCOME_API_KEY_REQUIRED=true   # default when Stripe is configured
+```
+
+Account balance: `GET /api/billing/account` (requires API key).
 
 ### Data Storage
 
