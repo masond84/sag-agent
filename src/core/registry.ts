@@ -22,6 +22,7 @@ import { reflectionSkill } from "../skills/reflection/index.js";
 import { commandsSkill } from "../skills/commands/index.js";
 import { gmailPollSkill } from "../skills/gmail-poll/index.js";
 import { incomeApiServicesSkill } from "../skills/income-api-services/index.js";
+import { contentEngineSkill } from "../skills/content-engine/index.js";
 
 const CONFIG_DIR = path.resolve(process.cwd(), "config/skills");
 
@@ -37,6 +38,7 @@ const scheduledSkillFactories: Record<string, () => ScheduledSkill> = {
   "focus-companion": () => focusCompanionSkill,
   reflection: () => reflectionSkill,
   "income-api-services": () => incomeApiServicesSkill,
+  "content-engine": () => contentEngineSkill,
 };
 
 const interactiveSkillFactories: Record<string, () => InteractiveSkill> = {

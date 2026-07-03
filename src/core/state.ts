@@ -22,6 +22,7 @@ interface AgentState {
   lastWatchdogAlertAt?: string;
   lastMorningBriefingDate?: string;
   lastReflectionAt?: string;
+  lastIncomeReportAt?: string;
 }
 
 async function ensureDataDir(): Promise<void> {
@@ -109,6 +110,17 @@ export async function getLastHeartbeatReportAt(): Promise<string | undefined> {
 export async function markHeartbeatReported(): Promise<void> {
   const state = await readState();
   state.lastHeartbeatReportAt = new Date().toISOString();
+  await writeState(state);
+}
+
+export async function getLastIncomeReportAt(): Promise<string | undefined> {
+  const state = await readState();
+  return state.lastIncomeReportAt;
+}
+
+export async function markIncomeReported(): Promise<void> {
+  const state = await readState();
+  state.lastIncomeReportAt = new Date().toISOString();
   await writeState(state);
 }
 

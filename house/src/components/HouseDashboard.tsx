@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { DevStatusPanel } from "@/components/DevStatusPanel";
 import { IncomeDashboard } from "@/components/IncomeDashboard";
+import { ContentDashboard } from "@/components/ContentDashboard";
 import { FacePanel } from "@/components/FacePanel";
 import { speakText, type FaceMode, type LiveKitAvatarHandle, fetchFaceSessionConfig } from "@/lib/face";
 import { SkillTreeGrid } from "@/components/SkillTreeGrid";
@@ -256,6 +257,7 @@ export function HouseDashboard() {
         </div>
         <aside className="flex flex-col gap-8">
           <IncomeDashboard />
+          <ContentDashboard />
           <DevStatusPanel />
           {photorealError && (
             <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">

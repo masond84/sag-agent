@@ -20,7 +20,13 @@ export type ActivityEventType =
   | "life_message_sent"
   | "reflection"
   | "income_check"
-  | "mcp_tool_call";
+  | "mcp_tool_call"
+  | "content_planned"
+  | "content_scripted"
+  | "content_manus_queued"
+  | "content_draft_ready"
+  | "content_posted"
+  | "content_failed";
 
 export interface ActivityEvent {
   at: string;

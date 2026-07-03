@@ -2,23 +2,21 @@
 
 Self-hosted personal agent: Telegram chat, Gmail monitoring, scheduled check-ins, optional autonomous dev runner.
 
-## Core Mission: Autonomous Income Generation
+## Core Mission: Dual Income Streams
 
-**SAG's primary job is to build and operate API service businesses autonomously.**
+**SAG runs two income experiments in parallel** toward a $200/week goal:
 
-Target: $200/week minimum revenue through API service arbitrage and original services.
+1. **API product** — Paid local services (PDF tools, image optimize, etc.) with Stripe credits; public site/tunnel comes next. See `docs/INCOME_SERVICES.md`.
+2. **Content engine** — Scripts, captions, and Manus/Higgsfield video packages for YouTube, TikTok, and Reels. Drafts only (you post). See `docs/CONTENT_ENGINE.md`.
 
-SAG goes to work every day on:
+Daily work:
 
-1. **Build & Deploy** — Creates professional API service websites (PDF tools, document conversion, translation, transcription, data enrichment, image processing, etc.)
-2. **Operate Services** — Autonomously fulfills customer requests, processes payments, handles rate limiting and usage tracking
-3. **Market Itself** — Generates SEO content, posts to social platforms, maintains product listings, optimizes conversion funnels
-4. **Evolve** — Monitors service performance, identifies new opportunities, implements improvements, optimizes pricing, adds features based on customer demand
-5. **Report Progress** — Tracks daily/weekly revenue, analyzes service metrics, reports on progress towards income goals
+1. **Operate APIs** — Fulfill requests, track usage/revenue, queue billing/public-URL priorities when behind goal
+2. **Produce content** — Plan episodes, write scripts, queue Manus packages, notify when drafts are ready in Home Base
+3. **Evolve** — Dev runner ships code improvements for both streams
+4. **Report** — Dual-stream stats in Home Base and Telegram
 
-This income-generation mission runs continuously alongside all other capabilities (companion, bills, focus, dev runner). The autonomous dev runner prioritizes tasks that move towards the revenue goal while maintaining code quality and existing features.
-
-Revenue tracking and service analytics are stored in `data/income-services/` and visible in the House UI dashboard.
+State lives under `data/income-services/` and `data/content/`, visible in the House UI (API business + Content panels).
 
 ## Architecture
 

@@ -42,6 +42,23 @@ import {
 import { mergePDFs, mergePDFsBatch, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
 import { markdownToPDF } from "../income/services/markdown-processor.js";
 import { optimizeImage } from "../income/services/image-processor.js";
+import {
+  clientKeyFromRequest,
+  consumeFreeTierSlot,
+  renderCheckoutCancelHtml,
+  renderCheckoutSuccessHtml,
+  renderPublicToolsPage,
+} from "../income/public-site.js";
+import {
+  getContentStats,
+  getEpisode,
+  listEpisodes,
+  markEpisodePosted,
+} from "../content/store.js";
+import { ingestEpisodeResult } from "../content/pipeline.js";
+import { listSeries } from "../content/series.js";
+import { logActivity } from "../activity-log.js";
+import type { ContentPlatform, EpisodeStatus, ManusResult } from "../content/types.js";
 
 export type HouseContextProvider = () => Promise<AgentHealthContext>;
 export type HouseInteractiveContextProvider = () => Promise<InteractiveSkillContext>;
@@ -54,6 +71,19 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
     "Cache-Control": "no-store",
   });
   res.end(payload);
+}
+
+function sendHtml(res: ServerResponse, status: number, html: string): void {
+  res.writeHead(status, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(html);
+}
+
+function wantsHtml(req: IncomingMessage): boolean {
+  const accept = req.headers.accept ?? "";
+  return accept.includes("text/html");
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -109,37 +139,78 @@ function activityToHouseEvent(event: ActivityEvent, sequence?: number): HouseEve
 }
 
 async function handleBillingCheckout(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const contentType = req.headers["content-type"] ?? "";
+  const isForm = contentType.includes("application/x-www-form-urlencoded");
+
   if (!isBillingEnabled()) {
+    if (isForm || wantsHtml(req)) {
+      sendHtml(res, 503, await renderPublicToolsPage({
+        error: "Billing is not configured. Set STRIPE_SECRET_KEY in .env.",
+      }));
+      return;
+    }
     sendJson(res, 503, { error: "Billing is not configured. Set STRIPE_SECRET_KEY in .env." });
     return;
   }
 
   const raw = await readBody(req);
   try {
-    const parsed = JSON.parse(raw) as {
-      packId?: string;
-      customerId?: string;
-      email?: string;
-      successUrl?: string;
-      cancelUrl?: string;
-    };
+    let packId = "";
+    let customerId: string | undefined;
+    let email: string | undefined;
+    let successUrl: string | undefined;
+    let cancelUrl: string | undefined;
 
-    if (!parsed.packId?.trim()) {
+    if (isForm) {
+      const params = new URLSearchParams(raw);
+      packId = params.get("packId")?.trim() ?? "";
+      customerId = params.get("customerId")?.trim() || undefined;
+      email = params.get("email")?.trim() || undefined;
+    } else {
+      const parsed = JSON.parse(raw) as {
+        packId?: string;
+        customerId?: string;
+        email?: string;
+        successUrl?: string;
+        cancelUrl?: string;
+      };
+      packId = parsed.packId?.trim() ?? "";
+      customerId = parsed.customerId?.trim();
+      email = parsed.email?.trim();
+      successUrl = parsed.successUrl?.trim();
+      cancelUrl = parsed.cancelUrl?.trim();
+    }
+
+    if (!packId) {
+      if (isForm) {
+        sendHtml(res, 400, await renderPublicToolsPage({ error: "packId is required" }));
+        return;
+      }
       sendJson(res, 400, { error: "packId is required" });
       return;
     }
 
     const session = await createCheckoutSession({
-      packId: parsed.packId.trim(),
-      customerId: parsed.customerId?.trim(),
-      email: parsed.email?.trim(),
-      successUrl: parsed.successUrl?.trim(),
-      cancelUrl: parsed.cancelUrl?.trim(),
+      packId,
+      customerId,
+      email,
+      successUrl,
+      cancelUrl,
     });
+
+    if (isForm) {
+      res.writeHead(303, { Location: session.url });
+      res.end();
+      return;
+    }
 
     sendJson(res, 200, session);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
+    if (isForm) {
+      sendHtml(res, 400, await renderPublicToolsPage({ error: detail }));
+      return;
+    }
     sendJson(res, 400, { error: detail });
   }
 }
@@ -160,6 +231,81 @@ async function handleRequest(
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key, Stripe-Signature",
     });
     res.end();
+    return;
+  }
+
+  // Public customer site (tool catalog, free tries, Stripe checkout links)
+  if ((path === "/" || path === "/tools") && req.method === "GET") {
+    sendHtml(res, 200, await renderPublicToolsPage({
+      notice: url.searchParams.get("cancelled") === "1" ? "Checkout cancelled. No charge was made." : undefined,
+    }));
+    return;
+  }
+
+  if (path === "/api/public/try/markdown-to-pdf" && req.method === "POST") {
+    const slot = await consumeFreeTierSlot(clientKeyFromRequest(req));
+    if (!slot.ok) {
+      sendJson(res, 429, { error: slot.error });
+      return;
+    }
+    const raw = await readBody(req);
+    try {
+      const parsed = JSON.parse(raw) as { markdown?: string };
+      const markdown = parsed.markdown?.trim();
+      if (!markdown) {
+        sendJson(res, 400, { error: "markdown is required" });
+        return;
+      }
+      if (markdown.length > 20_000) {
+        sendJson(res, 400, { error: "Markdown too long for free tier (max 20k chars)" });
+        return;
+      }
+      const result = await markdownToPDF({ markdown }, "free-tier");
+      sendJson(res, 200, { pdf: result.toString("base64"), remainingFree: slot.remaining });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/public/try/image-optimize" && req.method === "POST") {
+    const slot = await consumeFreeTierSlot(clientKeyFromRequest(req));
+    if (!slot.ok) {
+      sendJson(res, 429, { error: slot.error });
+      return;
+    }
+    const raw = await readBody(req);
+    try {
+      const parsed = JSON.parse(raw) as {
+        file?: string;
+        format?: "jpeg" | "png" | "webp";
+        quality?: number;
+      };
+      if (!parsed.file) {
+        sendJson(res, 400, { error: "file (base64) is required" });
+        return;
+      }
+      const file = Buffer.from(parsed.file, "base64");
+      if (file.byteLength > 2 * 1024 * 1024) {
+        sendJson(res, 400, { error: "Image too large for free tier (max 2MB)" });
+        return;
+      }
+      const result = await optimizeImage(
+        { file, format: parsed.format ?? "webp", quality: parsed.quality ?? 80 },
+        "free-tier",
+      );
+      sendJson(res, 200, {
+        image: result.data.toString("base64"),
+        format: result.format,
+        width: result.width,
+        height: result.height,
+        remainingFree: slot.remaining,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
     return;
   }
 
@@ -444,6 +590,8 @@ async function handleRequest(
     const serviceStats = await getServiceStats();
     const recentFailures = await getRecentFailures(5);
     const enabledServices = await getEnabledServices();
+    const content = await getContentStats();
+    const billing = getBillingConfigStatus();
     sendJson(res, 200, {
       revenue: stats,
       services: serviceStats,
@@ -453,7 +601,105 @@ async function handleRequest(
         name: s.name,
         description: s.description,
       })),
+      content,
+      streams: {
+        api: {
+          thisWeek: stats.thisWeek,
+          weeklyGoal: stats.weeklyGoal,
+          weeklyProgress: stats.weeklyProgress,
+          servicesLive: enabledServices.length,
+          stripeConfigured: billing.enabled,
+        },
+        content: {
+          draftsReady: content.draftsReady,
+          postedThisWeek: content.postedThisWeek,
+          inFlight: content.inFlight,
+          failed: content.failed,
+        },
+      },
     });
+    return;
+  }
+
+  if (path === "/api/content/stats" && req.method === "GET") {
+    sendJson(res, 200, await getContentStats());
+    return;
+  }
+
+  if (path === "/api/content/series" && req.method === "GET") {
+    sendJson(res, 200, { series: await listSeries() });
+    return;
+  }
+
+  if (path === "/api/content/episodes" && req.method === "GET") {
+    const statusParam = url.searchParams.get("status") as EpisodeStatus | null;
+    const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 100);
+    const episodes = await listEpisodes({
+      status: statusParam || undefined,
+      limit,
+    });
+    sendJson(res, 200, { episodes });
+    return;
+  }
+
+  const contentEpisodeMatch = path.match(/^\/api\/content\/episodes\/([^/]+)$/);
+  if (contentEpisodeMatch && req.method === "GET") {
+    const episode = await getEpisode(decodeURIComponent(contentEpisodeMatch[1]));
+    if (!episode) {
+      sendJson(res, 404, { error: "Episode not found" });
+      return;
+    }
+    sendJson(res, 200, { episode });
+    return;
+  }
+
+  const contentPostedMatch = path.match(/^\/api\/content\/episodes\/([^/]+)\/posted$/);
+  if (contentPostedMatch && req.method === "POST") {
+    const id = decodeURIComponent(contentPostedMatch[1]);
+    const raw = await readBody(req);
+    let platforms: ContentPlatform[] = ["youtube"];
+    try {
+      const parsed = JSON.parse(raw || "{}") as { platforms?: ContentPlatform[] };
+      if (Array.isArray(parsed.platforms) && parsed.platforms.length > 0) {
+        platforms = parsed.platforms;
+      }
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+    const episode = await markEpisodePosted(id, platforms);
+    if (!episode) {
+      sendJson(res, 404, { error: "Episode not found" });
+      return;
+    }
+    await logActivity("content_posted", `Marked posted: ${episode.title}`, {
+      episodeId: episode.id,
+      platforms: platforms.join(","),
+    });
+    sendJson(res, 200, { episode });
+    return;
+  }
+
+  const contentIngestMatch = path.match(/^\/api\/content\/episodes\/([^/]+)\/ingest$/);
+  if (contentIngestMatch && req.method === "POST") {
+    const id = decodeURIComponent(contentIngestMatch[1]);
+    const raw = await readBody(req);
+    let result: ManusResult;
+    try {
+      result = JSON.parse(raw || "{}") as ManusResult;
+    } catch {
+      sendJson(res, 400, { error: "Invalid JSON body" });
+      return;
+    }
+    const episode = await ingestEpisodeResult(id, result);
+    if (!episode) {
+      sendJson(res, 404, { error: "Episode not found" });
+      return;
+    }
+    await logActivity("content_draft_ready", `Draft ready: ${episode.title} — open Home Base → Content`, {
+      episodeId: episode.id,
+    });
+    sendJson(res, 200, { episode });
     return;
   }
 
@@ -498,21 +744,37 @@ async function handleRequest(
   if (path === "/api/billing/success" && req.method === "GET") {
     const sessionId = url.searchParams.get("session_id")?.trim();
     if (!sessionId) {
+      if (wantsHtml(req)) {
+        sendHtml(res, 400, await renderPublicToolsPage({ error: "Missing session_id" }));
+        return;
+      }
       sendJson(res, 400, { error: "session_id query parameter is required" });
       return;
     }
 
     try {
       const result = await getCheckoutSuccess(sessionId);
+      if (wantsHtml(req) || !req.headers.accept?.includes("application/json")) {
+        sendHtml(res, 200, renderCheckoutSuccessHtml(result));
+        return;
+      }
       sendJson(res, 200, result);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
+      if (wantsHtml(req) || !req.headers.accept?.includes("application/json")) {
+        sendHtml(res, 400, await renderPublicToolsPage({ error: detail }));
+        return;
+      }
       sendJson(res, 400, { error: detail });
     }
     return;
   }
 
   if (path === "/api/billing/cancel" && req.method === "GET") {
+    if (wantsHtml(req) || !req.headers.accept?.includes("application/json")) {
+      sendHtml(res, 200, renderCheckoutCancelHtml());
+      return;
+    }
     sendJson(res, 200, { cancelled: true });
     return;
   }
