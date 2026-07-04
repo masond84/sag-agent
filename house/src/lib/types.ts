@@ -176,6 +176,8 @@ export interface ContentStreamStats {
   postedThisWeek: number;
   inFlight: number;
   failed: number;
+  weeklyPostGoal: number;
+  weeklyProgress: number;
 }
 
 export interface ApiStreamStats {
@@ -194,6 +196,8 @@ export interface ContentStatsPayload {
   failed: number;
   total: number;
   seriesCount: number;
+  weeklyPostGoal: number;
+  weeklyProgress: number;
 }
 
 export type ContentPlatform = "youtube" | "tiktok" | "reels";

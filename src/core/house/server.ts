@@ -615,6 +615,8 @@ async function handleRequest(
           postedThisWeek: content.postedThisWeek,
           inFlight: content.inFlight,
           failed: content.failed,
+          weeklyPostGoal: content.weeklyPostGoal,
+          weeklyProgress: content.weeklyProgress,
         },
       },
     });

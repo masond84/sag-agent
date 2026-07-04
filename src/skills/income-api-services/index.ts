@@ -84,6 +84,15 @@ async function buildIncomeContext(): Promise<IncomeGoalContext> {
       reason: `${content.failed} failed content episode(s) — pipeline needs attention`,
     });
   }
+
+  const contentPostGoal = content.weeklyPostGoal;
+  if (content.postedThisWeek < contentPostGoal && new Date().getDay() >= 5) {
+    developmentPriorities.push({
+      task: "Publish content drafts to YouTube/TikTok/Reels",
+      impact: "medium",
+      reason: `${content.postedThisWeek}/${contentPostGoal} posts this week — ${content.draftsReady} draft(s) waiting`,
+    });
+  }
   
   if (marketingNeeds.length === 0) {
     marketingNeeds.push("Continue SEO content generation (1 article/week)");
@@ -114,7 +123,7 @@ async function formatIncomeReport(
   parts.push(`API this week: $${revenue.thisWeek.toFixed(2)} (${revenue.weeklyProgress.toFixed(1)}%)`);
   parts.push(`Gap: $${context.gap.toFixed(2)} (${revenue.daysUntilGoal} days remaining)`);
   parts.push(
-    `Content: ${content.draftsReady} drafts ready · ${content.postedThisWeek} posted this week · ${content.inFlight} in flight`,
+    `Content: ${content.draftsReady} drafts ready · ${content.postedThisWeek}/${content.weeklyPostGoal} posted this week · ${content.inFlight} in flight`,
   );
   parts.push("");
   

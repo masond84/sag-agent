@@ -10,10 +10,19 @@ function formatCurrency(amount: number): string {
 
 export function IncomeDashboard() {
   const [stats, setStats] = useState<IncomeStatsPayload | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const refresh = useCallback(async () => {
     const payload = await fetchIncomeStats();
-    setStats(payload);
+    if (payload) {
+      setStats(payload);
+      setLoadError(false);
+    } else {
+      setStats((current) => {
+        if (current === null) setLoadError(true);
+        return current;
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -24,11 +33,24 @@ export function IncomeDashboard() {
     return () => clearInterval(timer);
   }, [refresh]);
 
+  if (loadError && !stats) {
+    return (
+      <section className="space-y-3 rounded-lg border border-sag-border bg-white/[0.02] p-4">
+        <h2 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
+          Dual income
+        </h2>
+        <p className="text-xs text-amber-200/80">
+          Worker offline — start SAG with HOUSE_SERVER_ENABLED=true.
+        </p>
+      </section>
+    );
+  }
+
   if (!stats) {
     return (
       <section className="space-y-3 rounded-lg border border-sag-border bg-white/[0.02] p-4">
         <h2 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
-          API business
+          Dual income
         </h2>
         <p className="text-sm text-sag-muted">Loading income stats…</p>
       </section>
@@ -39,22 +61,31 @@ export function IncomeDashboard() {
   const gap = Math.max(0, revenue.weeklyGoal - revenue.thisWeek);
   const onTrack = revenue.weeklyProgress >= 100;
   const progressWidth = Math.min(100, revenue.weeklyProgress);
-  const streamLabel = streams
-    ? `API $${streams.api.thisWeek.toFixed(0)} · Content ${streams.content.draftsReady} drafts / ${streams.content.postedThisWeek} posted`
-    : `${enabledServices.length} services live`;
+
+  const serviceNameById = new Map(enabledServices.map((s) => [s.id, s.name]));
+
+  const contentStream = streams?.content;
+  const contentOnTrack = contentStream ? contentStream.weeklyProgress >= 100 : false;
+  const contentProgressWidth = contentStream
+    ? Math.min(100, contentStream.weeklyProgress)
+    : 0;
 
   return (
     <section className="space-y-4 rounded-lg border border-sag-border bg-white/[0.02] p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-[11px] font-medium uppercase tracking-wider text-sag-muted">
-          API business
+          Dual income
         </h2>
-        <span className="max-w-[58%] text-right text-[10px] uppercase tracking-wide text-sag-muted">
-          {streamLabel}
+        <span className="text-[10px] uppercase tracking-wide text-sag-muted">
+          {streams?.api.stripeConfigured ? "Stripe on" : "Stripe off"}
+          {" · "}
+          {streams?.api.servicesLive ?? enabledServices.length} API service
+          {(streams?.api.servicesLive ?? enabledServices.length) === 1 ? "" : "s"}
         </span>
       </div>
 
       <div className="space-y-2">
+        <p className="text-[10px] uppercase tracking-wide text-sag-muted">API revenue</p>
         <div className="flex items-baseline justify-between gap-2">
           <p className="text-2xl font-medium tabular-nums text-sag-text">
             {formatCurrency(revenue.thisWeek)}
@@ -75,10 +106,39 @@ export function IncomeDashboard() {
 
         <p className="text-xs text-sag-muted">
           {onTrack
-            ? "Weekly goal reached."
+            ? "Weekly API goal reached."
             : `${formatCurrency(gap)} to go · ${revenue.daysUntilGoal} day(s) left in week`}
         </p>
       </div>
+
+      {contentStream && (
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-wide text-sag-muted">Content posts</p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-lg font-medium tabular-nums text-sag-text">
+              {contentStream.postedThisWeek}
+            </p>
+            <p className="text-xs text-sag-muted">
+              of {contentStream.weeklyPostGoal} / week
+            </p>
+          </div>
+
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className={`h-full rounded-full transition-all ${
+                contentOnTrack ? "bg-emerald-500/60" : "bg-teal-500/60"
+              }`}
+              style={{ width: `${contentProgressWidth}%` }}
+            />
+          </div>
+
+          <p className="text-xs text-sag-muted">
+            {contentStream.draftsReady} draft{contentStream.draftsReady === 1 ? "" : "s"} ready
+            {contentStream.failed > 0 ? ` · ${contentStream.failed} failed` : ""}
+            {contentStream.inFlight > 0 ? ` · ${contentStream.inFlight} in flight` : ""}
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <StatCell label="Today" value={formatCurrency(revenue.today)} />
@@ -94,7 +154,9 @@ export function IncomeDashboard() {
                 key={svc.serviceId}
                 className="flex items-center justify-between gap-2 rounded-md border border-sag-border bg-white/[0.02] px-2.5 py-1.5"
               >
-                <span className="truncate text-xs text-sag-text/90">{svc.serviceId}</span>
+                <span className="truncate text-xs text-sag-text/90">
+                  {serviceNameById.get(svc.serviceId) ?? svc.serviceId}
+                </span>
                 <span className="shrink-0 tabular-nums text-xs text-sag-muted">
                   {formatCurrency(svc.totalProfit)} · {svc.successfulCalls} calls
                 </span>
@@ -112,7 +174,8 @@ export function IncomeDashboard() {
           <ul className="space-y-1">
             {recentFailures.slice(0, 2).map((failure, index) => (
               <li key={`${failure.timestamp}-${index}`} className="text-xs text-amber-100/80">
-                {failure.serviceId}: {failure.errorMessage ?? "Unknown error"}
+                {serviceNameById.get(failure.serviceId) ?? failure.serviceId}:{" "}
+                {failure.errorMessage ?? "Unknown error"}
               </li>
             ))}
           </ul>
@@ -122,6 +185,7 @@ export function IncomeDashboard() {
       {services.length === 0 && enabledServices.length > 0 && (
         <p className="text-xs text-sag-muted">
           No revenue yet. {enabledServices.length} service(s) ready for requests.
+          {!streams?.api.stripeConfigured && " Configure Stripe to accept payments."}
         </p>
       )}
     </section>
