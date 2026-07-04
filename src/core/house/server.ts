@@ -33,6 +33,7 @@ import { getEnabledServices } from "../income/service-config.js";
 import { authenticateServiceRequest, requireCreditsForService } from "../income/api-auth.js";
 import {
   createCheckoutSession,
+  getBillingBaseUrl,
   getCheckoutSuccess,
   getCreditPacks,
   getBillingConfigStatus,
@@ -56,6 +57,7 @@ import {
   markEpisodePosted,
 } from "../content/store.js";
 import { ingestEpisodeResult } from "../content/pipeline.js";
+import { isManusApiConfigured, isManusEnabled } from "../content/manus.js";
 import { listSeries } from "../content/series.js";
 import { logActivity } from "../activity-log.js";
 import type { ContentPlatform, EpisodeStatus, ManusResult } from "../content/types.js";
@@ -592,6 +594,7 @@ async function handleRequest(
     const enabledServices = await getEnabledServices();
     const content = await getContentStats();
     const billing = getBillingConfigStatus();
+    const publicToolsUrl = `${getBillingBaseUrl()}/tools`;
     sendJson(res, 200, {
       revenue: stats,
       services: serviceStats,
@@ -602,13 +605,17 @@ async function handleRequest(
         description: s.description,
       })),
       content,
+      publicToolsUrl,
       streams: {
         api: {
           thisWeek: stats.thisWeek,
+          lastWeek: stats.lastWeek,
           weeklyGoal: stats.weeklyGoal,
           weeklyProgress: stats.weeklyProgress,
           servicesLive: enabledServices.length,
           stripeConfigured: billing.enabled,
+          stripeWebhookConfigured: billing.webhookSecretConfigured,
+          publicToolsUrl,
         },
         content: {
           draftsReady: content.draftsReady,
@@ -617,6 +624,8 @@ async function handleRequest(
           failed: content.failed,
           weeklyPostGoal: content.weeklyPostGoal,
           weeklyProgress: content.weeklyProgress,
+          manusEnabled: isManusEnabled(),
+          manusApiConfigured: isManusApiConfigured(),
         },
       },
     });
@@ -624,7 +633,12 @@ async function handleRequest(
   }
 
   if (path === "/api/content/stats" && req.method === "GET") {
-    sendJson(res, 200, await getContentStats());
+    const stats = await getContentStats();
+    sendJson(res, 200, {
+      ...stats,
+      manusEnabled: isManusEnabled(),
+      manusApiConfigured: isManusApiConfigured(),
+    });
     return;
   }
 

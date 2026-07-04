@@ -178,14 +178,19 @@ export interface ContentStreamStats {
   failed: number;
   weeklyPostGoal: number;
   weeklyProgress: number;
+  manusEnabled?: boolean;
+  manusApiConfigured?: boolean;
 }
 
 export interface ApiStreamStats {
   thisWeek: number;
+  lastWeek?: number;
   weeklyGoal: number;
   weeklyProgress: number;
   servicesLive: number;
   stripeConfigured: boolean;
+  stripeWebhookConfigured?: boolean;
+  publicToolsUrl?: string;
 }
 
 export interface ContentStatsPayload {
@@ -198,6 +203,8 @@ export interface ContentStatsPayload {
   seriesCount: number;
   weeklyPostGoal: number;
   weeklyProgress: number;
+  manusEnabled?: boolean;
+  manusApiConfigured?: boolean;
 }
 
 export type ContentPlatform = "youtube" | "tiktok" | "reels";
@@ -246,12 +253,23 @@ export interface ContentEpisode {
   platformsPosted: ContentPlatform[];
 }
 
+export interface ManusIngestResult {
+  videoUrl?: string;
+  videoPath?: string;
+  voiceoverUrl?: string;
+  voiceoverPath?: string;
+  thumbnailPath?: string;
+  durationSeconds?: number;
+  notes?: string;
+}
+
 export interface IncomeStatsPayload {
   revenue: IncomeRevenueStats;
   services: IncomeServiceStats[];
   recentFailures: IncomeServiceFailure[];
   enabledServices: IncomeEnabledService[];
   content?: ContentStatsPayload;
+  publicToolsUrl?: string;
   streams?: {
     api: ApiStreamStats;
     content: ContentStreamStats;

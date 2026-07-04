@@ -6,6 +6,7 @@ import type {
   DevStatusPayload,
   HouseEvent,
   IncomeStatsPayload,
+  ManusIngestResult,
   RequestSkillBuildResult,
   SkillNodeDetail,
   SkillTreePayload,
@@ -114,6 +115,31 @@ export async function markContentPosted(
     return payload.episode;
   } catch {
     return null;
+  }
+}
+
+export async function ingestContentResult(
+  episodeId: string,
+  result: ManusIngestResult,
+): Promise<ContentEpisode | null> {
+  try {
+    const response = await fetch(
+      `${getFetchBase()}/api/content/episodes/${encodeURIComponent(episodeId)}/ingest`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(result),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) {
+      const payload = (await response.json()) as { error?: string };
+      throw new Error(payload.error ?? "Ingest failed");
+    }
+    const payload = (await response.json()) as { episode: ContentEpisode };
+    return payload.episode;
+  } catch (error) {
+    throw error;
   }
 }
 

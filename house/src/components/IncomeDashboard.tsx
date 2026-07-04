@@ -57,10 +57,14 @@ export function IncomeDashboard() {
     );
   }
 
-  const { revenue, services, recentFailures, enabledServices, streams } = stats;
+  const { revenue, services, recentFailures, enabledServices, streams, publicToolsUrl } = stats;
   const gap = Math.max(0, revenue.weeklyGoal - revenue.thisWeek);
   const onTrack = revenue.weeklyProgress >= 100;
   const progressWidth = Math.min(100, revenue.weeklyProgress);
+  const toolsUrl = streams?.api.publicToolsUrl ?? publicToolsUrl;
+  const stripeOn = streams?.api.stripeConfigured ?? false;
+  const webhookOn = streams?.api.stripeWebhookConfigured ?? false;
+  const lastWeek = streams?.api.lastWeek ?? revenue.lastWeek;
 
   const serviceNameById = new Map(enabledServices.map((s) => [s.id, s.name]));
 
@@ -77,7 +81,8 @@ export function IncomeDashboard() {
           Dual income
         </h2>
         <span className="text-[10px] uppercase tracking-wide text-sag-muted">
-          {streams?.api.stripeConfigured ? "Stripe on" : "Stripe off"}
+          {stripeOn ? "Stripe on" : "Stripe off"}
+          {stripeOn && !webhookOn ? " · webhook off" : ""}
           {" · "}
           {streams?.api.servicesLive ?? enabledServices.length} API service
           {(streams?.api.servicesLive ?? enabledServices.length) === 1 ? "" : "s"}
@@ -142,7 +147,31 @@ export function IncomeDashboard() {
 
       <div className="grid grid-cols-2 gap-2 text-xs">
         <StatCell label="Today" value={formatCurrency(revenue.today)} />
+        <StatCell label="Last week" value={formatCurrency(lastWeek)} />
         <StatCell label="All time" value={formatCurrency(revenue.allTime)} />
+        {toolsUrl && (
+          <div className="col-span-2 rounded-md border border-sag-border bg-white/[0.02] px-2.5 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-sag-muted">Public tools</p>
+            <a
+              href={toolsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-0.5 block truncate text-xs text-sag-accent hover:underline"
+            >
+              {toolsUrl}
+            </a>
+            {!stripeOn && (
+              <p className="mt-1 text-[11px] text-sag-muted">
+                Set STRIPE_SECRET_KEY to accept paid API credits.
+              </p>
+            )}
+            {stripeOn && !webhookOn && (
+              <p className="mt-1 text-[11px] text-amber-100/70">
+                Stripe checkout works; set STRIPE_WEBHOOK_SECRET for automatic credit top-ups.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {services.length > 0 && (
@@ -185,7 +214,7 @@ export function IncomeDashboard() {
       {services.length === 0 && enabledServices.length > 0 && (
         <p className="text-xs text-sag-muted">
           No revenue yet. {enabledServices.length} service(s) ready for requests.
-          {!streams?.api.stripeConfigured && " Configure Stripe to accept payments."}
+          {!stripeOn && " Configure Stripe to accept payments."}
         </p>
       )}
     </section>
