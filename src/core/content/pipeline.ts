@@ -1,6 +1,6 @@
 import { getSeries, pickSeriesForToday } from "./series.js";
 import { generateEpisodeContent } from "./script.js";
-import { isManusEnabled, queueManusJob, tryIngestManusResult } from "./manus.js";
+import { isManusEnabled, isManusFailureResult, queueManusJob, tryIngestManusResult } from "./manus.js";
 import {
   countEpisodesCreatedToday,
   countInFlight,
@@ -94,6 +94,19 @@ export async function advanceInFlightEpisodes(): Promise<PipelineEvent[]> {
     try {
       const result = await tryIngestManusResult(episode);
       if (!result) {
+        continue;
+      }
+
+      if (isManusFailureResult(result)) {
+        const failed = await updateEpisodeStatus(episode.id, "failed", {
+          error: result.notes ?? "Manus task failed with no media output",
+        });
+        events.push({
+          type: "content_failed",
+          summary: `Manus failed: ${episode.title} — ${(result.notes ?? "no media").slice(0, 120)}`,
+          episode: failed ?? episode,
+          notify: true,
+        });
         continue;
       }
 
@@ -252,6 +265,8 @@ export async function runContentPipelineTick(): Promise<PipelineEvent[]> {
   events.push(...(await advancePlannedEpisodes()));
   events.push(...(await advanceScriptedEpisodes()));
   events.push(...(await planAndScriptNewEpisode()));
+  // Second pass: queue Manus for episodes scripted in this same tick
+  events.push(...(await advanceScriptedEpisodes()));
   return events;
 }
 
@@ -265,5 +280,12 @@ export async function ingestEpisodeResult(
 
   const { writeManusResult } = await import("./store.js");
   await writeManusResult(episodeId, result);
+
+  if (isManusFailureResult(result)) {
+    return updateEpisodeStatus(episodeId, "failed", {
+      error: result.notes ?? "Manus task failed with no media output",
+    });
+  }
+
   return updateEpisodeStatus(episodeId, "draft_ready", applyManusResult(episode, result));
 }

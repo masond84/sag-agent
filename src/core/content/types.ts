@@ -84,4 +84,6 @@ export interface ContentStats {
   failed: number;
   total: number;
   seriesCount: number;
+  weeklyPostGoal: number;
+  weeklyProgress: number;
 }

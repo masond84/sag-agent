@@ -177,13 +177,16 @@ export async function writeManusResult(episodeId: string, result: ManusResult): 
   );
 }
 
+/** Sunday-start week boundary — matches API revenue stats in revenue-tracking.ts */
 function startOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  copy.setHours(0, 0, 0, 0);
-  copy.setDate(copy.getDate() + diff);
+  const copy = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  copy.setDate(copy.getDate() - copy.getDay());
   return copy;
+}
+
+export function getContentWeeklyPostGoal(): number {
+  const n = Number(process.env.CONTENT_WEEKLY_POST_GOAL ?? 3);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 3;
 }
 
 export async function getContentStats(): Promise<ContentStats> {
@@ -210,6 +213,8 @@ export async function getContentStats(): Promise<ContentStats> {
   }
 
   const inFlight = IN_FLIGHT.reduce((sum, s) => sum + (byStatus[s] ?? 0), 0);
+  const weeklyPostGoal = getContentWeeklyPostGoal();
+  const weeklyProgress = weeklyPostGoal > 0 ? (postedThisWeek / weeklyPostGoal) * 100 : 0;
 
   return {
     byStatus,
@@ -219,6 +224,8 @@ export async function getContentStats(): Promise<ContentStats> {
     failed: byStatus.failed,
     total: episodes.length,
     seriesCount: series.filter((s) => s.enabled).length,
+    weeklyPostGoal,
+    weeklyProgress,
   };
 }
 

@@ -274,3 +274,13 @@ export async function tryIngestManusResult(episode: ContentEpisode): Promise<Man
 export function getManusPackagePath(episodeId: string): string {
   return getPackageDir(episodeId);
 }
+
+/** True when Manus returned a failure signal with no usable media assets. */
+export function isManusFailureResult(result: ManusResult): boolean {
+  const hasMedia = Boolean(
+    result.videoUrl || result.videoPath || result.voiceoverUrl || result.voiceoverPath,
+  );
+  if (hasMedia) return false;
+  const notes = (result.notes ?? "").toLowerCase();
+  return notes.includes("failed") || notes.includes("error");
+}
