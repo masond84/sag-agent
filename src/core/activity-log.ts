@@ -26,7 +26,9 @@ export type ActivityEventType =
   | "content_manus_queued"
   | "content_draft_ready"
   | "content_posted"
-  | "content_failed";
+  | "content_failed"
+  | "zsync_digest"
+  | "zsync_bill_alert";
 
 export interface ActivityEvent {
   at: string;

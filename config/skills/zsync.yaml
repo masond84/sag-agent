@@ -1,0 +1,4 @@
+id: zsync
+name: Z-Sync
+enabled: true
+kind: scheduled

@@ -38,6 +38,10 @@ SAG keeps two Mem0 scopes: **user** memories (you) and **agent** memories (SAG's
 - Reflection skill (1pm + 9pm default) distills activity into agent Mem0
 - Focus anchors (work) + random life texts (personal, up to 5/day) via unified companion
 - Chat recall tools pull activity + agent memories + conversation highlights for "what do you remember?" questions
+
+## Z-Sync (shared state with Muse)
+
+`z-sync/` is committed shared state both agents read and write — goals, bills, finance snapshots, job pipeline, Deft Point BD. Git is the sync bus: Muse updates via commits/PRs, SAG pulls on refresh, and SAG writes status back the same way. The `zsync` scheduled skill reads these files for bill-due alerts and a daily digest (floor, upcoming bills, pipeline, BD, self-funding). Contract: `z-sync/README.md`.
 - Short affirmations ("sounds good", "do it") after a code-change proposal queue dev tasks with thread context
 
 Telegram: `/memories` (you), `/sag-memories` (SAG), `/remember <fact>` to save user facts.

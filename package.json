@@ -2,7 +2,7 @@
   "name": "sag",
   "version": "0.1.0",
   "private": true,
-  "description": "Self-hosted agent worker — skill runner with Conservice as first skill",
+  "description": "Self-hosted agent worker \u2014 skill runner with Conservice as first skill",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
@@ -46,7 +46,8 @@
     "test:income": "tsx src/scripts/test-income.ts",
     "test:billing": "tsx src/scripts/test-billing.ts",
     "test:content": "tsx src/scripts/test-content.ts",
-    "test:arbitrage": "tsx src/scripts/test-arbitrage.ts"
+    "test:arbitrage": "tsx src/scripts/test-arbitrage.ts",
+    "test:zsync": "tsx src/scripts/test-zsync.ts"
   },
   "engines": {
     "node": ">=20"

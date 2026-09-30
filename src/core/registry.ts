@@ -23,6 +23,7 @@ import { commandsSkill } from "../skills/commands/index.js";
 import { gmailPollSkill } from "../skills/gmail-poll/index.js";
 import { incomeApiServicesSkill } from "../skills/income-api-services/index.js";
 import { contentEngineSkill } from "../skills/content-engine/index.js";
+import { zsyncSkill } from "../skills/zsync/index.js";
 
 const CONFIG_DIR = path.resolve(process.cwd(), "config/skills");
 
@@ -39,6 +40,7 @@ const scheduledSkillFactories: Record<string, () => ScheduledSkill> = {
   reflection: () => reflectionSkill,
   "income-api-services": () => incomeApiServicesSkill,
   "content-engine": () => contentEngineSkill,
+  zsync: () => zsyncSkill,
 };
 
 const interactiveSkillFactories: Record<string, () => InteractiveSkill> = {
