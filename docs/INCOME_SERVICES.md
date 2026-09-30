@@ -70,6 +70,9 @@ POST /api/services/pdf/merge
 POST /api/services/pdf/split
 POST /api/services/pdf/compress
 POST /api/services/markdown-to-pdf
+POST /api/services/text/translate
+POST /api/services/audio/transcribe
+POST /api/services/enrich/email
 GET  /api/income/stats
 GET  /api/income/services
 ```
@@ -82,6 +85,47 @@ Autonomous dev runner now prioritizes income-generating tasks:
 2. New service launches
 3. Marketing automation
 4. Existing capability improvements
+
+## Tier 2: API Arbitrage
+
+Wholesale APIs resold at ≥2x markup. Zero marginal labor, 24/7 fulfillment —
+the agent-native revenue stream. All arbitrage services are `enabled: false`
+by default and activate when their wholesale key is set in `.env`.
+
+| Service | Wholesale | Sells at | Markup | Endpoint |
+|---------|-----------|----------|--------|----------|
+| Translation | DeepL (`DEEPL_API_KEY`) | $0.000015/char | 3x | `POST /api/services/text/translate` |
+| Transcription | Whisper (`OPENAI_API_KEY`) | $0.012/min | 2x | `POST /api/services/audio/transcribe` |
+| Email verification | AbstractAPI (`EMAIL_VERIFY_API_KEY`) | $0.04/call | 5x | `POST /api/services/enrich/email` |
+
+Unit economics live in `src/core/income/service-config.ts` (adjustable without
+code changes). Every call is logged with revenue/cost/profit to
+`data/income-services/usage.jsonl`, so the income report shows true margin per
+service.
+
+Notes:
+- DeepL free-tier keys end with `:fx` and are auto-routed to the free API host.
+- Transcription bills on actual audio minutes from Whisper's timestamps
+  (minimum 1 minute), so margin is always 2x regardless of file length.
+- Translation caps at 5,000 characters per request; transcription caps at 25MB.
+
+### Self-funding
+
+`src/core/income/self-funding.ts` compares this week's API revenue against the
+agent's estimated weekly operating cost (`AGENT_WEEKLY_COST_USD`, default $25 —
+tune it to real LLM/memory spend). The income report carries a self-funding
+line so the agent demonstrably pays for its own existence before chasing the
+$200/week goal:
+
+```
+Self-funding: COVERED (+$12.40 over ~$25.00 est. weekly cost)
+```
+
+Validate the whole tier without secrets:
+
+```bash
+npm run test:arbitrage
+```
 
 ## Usage
 
@@ -174,10 +218,11 @@ curl http://localhost:9473/api/income/stats
 - [ ] Email notifications
 
 ### Phase 3: Service Expansion
-- [ ] Image optimization service
-- [ ] Translation API (DeepL proxy)
-- [ ] Transcription API (Whisper)
-- [ ] Data enrichment service
+- [x] Image optimization service
+- [x] Translation API (DeepL proxy) — implemented, needs DEEPL_API_KEY
+- [x] Transcription API (Whisper) — implemented, needs OPENAI_API_KEY
+- [x] Data enrichment service (email verification) — implemented, needs EMAIL_VERIFY_API_KEY
+- [x] Self-funding tracker (revenue vs agent operating cost in income report)
 - [ ] Batch processing
 
 ### Phase 4: Autonomous Growth

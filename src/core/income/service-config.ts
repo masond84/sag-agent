@@ -117,6 +117,44 @@ const DEFAULT_SERVICES: ServiceConfig[] = [
       rateLimit: 100,
     },
   },
+  {
+    id: "transcription",
+    name: "Audio Transcription API",
+    description: "Speech-to-text transcription powered by Whisper",
+    enabled: false,
+    pricing: {
+      model: "per_unit",
+      unit: "minute",
+      pricePerUnit: 0.012,
+    },
+    backend: {
+      type: "api_proxy",
+      apiProvider: "openai-whisper",
+      costPerUnit: 0.006,
+    },
+    limits: {
+      maxSize: 25 * 1024 * 1024,
+      rateLimit: 20,
+    },
+  },
+  {
+    id: "email-verify",
+    name: "Email Verification API",
+    description: "Validate email deliverability and quality",
+    enabled: false,
+    pricing: {
+      model: "per_call",
+      pricePerCall: 0.04,
+    },
+    backend: {
+      type: "api_proxy",
+      apiProvider: "abstractapi",
+      costPerUnit: 0.008,
+    },
+    limits: {
+      rateLimit: 60,
+    },
+  },
 ];
 
 export async function loadServiceConfigs(): Promise<ServiceConfig[]> {

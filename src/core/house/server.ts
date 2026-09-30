@@ -43,6 +43,9 @@ import {
 import { mergePDFs, mergePDFsBatch, splitPDF, compressPDF } from "../income/services/pdf-processor.js";
 import { markdownToPDF } from "../income/services/markdown-processor.js";
 import { optimizeImage } from "../income/services/image-processor.js";
+import { translateText } from "../income/services/translation.js";
+import { transcribeAudio } from "../income/services/transcription.js";
+import { verifyEmail } from "../income/services/enrichment.js";
 import {
   clientKeyFromRequest,
   consumeFreeTierSlot,
@@ -1086,6 +1089,159 @@ async function handleRequest(
         width: result.width,
         height: result.height,
       });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/text/translate" && req.method === "POST") {
+    const raw = await readBody(req);
+    let text: string | undefined;
+    let targetLang: string | undefined;
+    let sourceLang: string | undefined;
+    let bodyCustomerId: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        text?: string;
+        targetLang?: string;
+        sourceLang?: string;
+        customerId?: string;
+      };
+      text = parsed.text;
+      targetLang = parsed.targetLang;
+      sourceLang = parsed.sourceLang;
+      bodyCustomerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    if (!text || !targetLang) {
+      sendJson(res, 400, { error: "text and targetLang are required" });
+      return;
+    }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "translation");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
+
+    try {
+      const result = await translateText(
+        { text, targetLang, sourceLang },
+        resolved.customerId,
+      );
+      sendJson(res, 200, {
+        text: result.text,
+        detectedSourceLang: result.detectedSourceLang,
+        characters: result.characters,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/audio/transcribe" && req.method === "POST") {
+    const raw = await readBody(req);
+    let audio: Buffer;
+    let filename: string | undefined;
+    let language: string | undefined;
+    let bodyCustomerId: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        file: string;
+        filename?: string;
+        language?: string;
+        customerId?: string;
+      };
+      audio = Buffer.from(parsed.file, "base64");
+      filename = parsed.filename;
+      language = parsed.language;
+      bodyCustomerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "transcription");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
+
+    try {
+      const result = await transcribeAudio(
+        { audio, filename, language },
+        resolved.customerId,
+      );
+      sendJson(res, 200, {
+        text: result.text,
+        durationSeconds: result.durationSeconds,
+        billableMinutes: result.billableMinutes,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      sendJson(res, 500, { error: detail });
+    }
+    return;
+  }
+
+  if (path === "/api/services/enrich/email" && req.method === "POST") {
+    const raw = await readBody(req);
+    let email: string | undefined;
+    let bodyCustomerId: string | undefined;
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        email?: string;
+        customerId?: string;
+      };
+      email = parsed.email;
+      bodyCustomerId = parsed.customerId;
+    } catch {
+      sendJson(res, 400, { error: "Invalid request body" });
+      return;
+    }
+
+    if (!email) {
+      sendJson(res, 400, { error: "email is required" });
+      return;
+    }
+
+    const resolved = await resolveServiceCustomer(req, bodyCustomerId);
+    if ("error" in resolved) {
+      sendJson(res, resolved.status, { error: resolved.error });
+      return;
+    }
+
+    const creditCheck = await ensureServiceCredits(resolved.customerId, "email-verify");
+    if ("error" in creditCheck) {
+      sendJson(res, creditCheck.status, { error: creditCheck.error });
+      return;
+    }
+
+    try {
+      const result = await verifyEmail({ email }, resolved.customerId);
+      sendJson(res, 200, result);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       sendJson(res, 500, { error: detail });

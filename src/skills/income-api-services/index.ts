@@ -1,5 +1,6 @@
 import type { ScheduledSkill, ScheduledSkillResult, AgentHealthContext, IncomeGoalContext } from "../../types.js";
 import { getRevenueStats, getServiceStats, getRecentFailures } from "../../core/income/revenue-tracking.js";
+import { getSelfFundingStatus } from "../../core/income/self-funding.js";
 import { getEnabledServices } from "../../core/income/service-config.js";
 import { logActivity } from "../../core/activity-log.js";
 import { getContentStats } from "../../core/content/store.js";
@@ -134,6 +135,12 @@ async function formatIncomeReport(
     parts.push(`Yesterday: $${revenue.yesterday.toFixed(2)}`);
   }
   parts.push(`All-time: $${revenue.allTime.toFixed(2)}`);
+
+  const funding = await getSelfFundingStatus();
+  const fundingLine = funding.covered
+    ? `Self-funding: COVERED (+$${funding.surplus.toFixed(2)} over ~$${funding.weeklyCostUsd.toFixed(2)} est. weekly cost)`
+    : `Self-funding: $${Math.abs(funding.surplus).toFixed(2)} short of ~$${funding.weeklyCostUsd.toFixed(2)} est. weekly cost`;
+  parts.push(fundingLine);
   parts.push("");
   
   if (context.topServices.length > 0) {
