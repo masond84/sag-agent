@@ -1,0 +1,24 @@
+{
+  "id": "nicotine-quit",
+  "name": "Quit nicotine via patches",
+  "status": "active",
+  "target": {
+    "type": "milestone",
+    "description": "Successfully quit vaping using nicotine patches; trigger: current vape dies"
+  },
+  "measurement": {
+    "current": null,
+    "measuredAt": null,
+    "stale": true,
+    "missing": true
+  },
+  "nextAction": {
+    "description": "Devin to report when vape dies and patches procurement status",
+    "ownerOfNextInput": "devin"
+  },
+  "loopId": null,
+  "notes": "Health goal; start date pending vape hardware failure",
+  "createdAt": "2026-11-08T15:03:26.502Z",
+  "updatedAt": "2026-11-08T15:03:26.502Z",
+  "updatedBy": "sag"
+}
