@@ -1,0 +1,25 @@
+{
+  "id": "trailblaize-gate",
+  "name": "Trailblaize decision gate",
+  "status": "active",
+  "target": {
+    "type": "milestone",
+    "description": "No signing without written $80k+ base salary and cliff protection"
+  },
+  "measurement": {
+    "current": "Gate not yet triggered; no pending Trailblaize decision",
+    "measuredAt": "2026-11-08T15:03:26.502Z",
+    "source": "user-provided gate",
+    "stale": false,
+    "missing": false
+  },
+  "nextAction": {
+    "description": "Monitor for Trailblaize offer; validate against gate criteria when received",
+    "ownerOfNextInput": "sag"
+  },
+  "loopId": null,
+  "notes": "Decision gate - blocks acceptance below $80k or without cliff protection",
+  "createdAt": "2026-11-08T15:03:26.502Z",
+  "updatedAt": "2026-11-08T15:03:26.502Z",
+  "updatedBy": "sag"
+}

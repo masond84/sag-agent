@@ -1,0 +1,24 @@
+{
+  "id": "tampa-ai-builders",
+  "name": "Tampa 20s AI Builders growth",
+  "status": "active",
+  "target": {
+    "type": "milestone",
+    "description": "30 members, 10 contributors, 5 returning attendees"
+  },
+  "measurement": {
+    "current": null,
+    "measuredAt": null,
+    "stale": true,
+    "missing": true
+  },
+  "nextAction": {
+    "description": "Establish data collection mechanism for member/contributor/attendance counts",
+    "ownerOfNextInput": "devin"
+  },
+  "loopId": null,
+  "notes": "Community building goal; metrics not yet tracked in z-sync",
+  "createdAt": "2026-11-08T15:03:26.502Z",
+  "updatedAt": "2026-11-08T15:03:26.502Z",
+  "updatedBy": "sag"
+}

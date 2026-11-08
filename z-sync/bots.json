@@ -1,0 +1,33 @@
+{
+  "bots": [
+    {
+      "id": "emi-grok-coordinator",
+      "name": "Emi (Grok coordinator bot)",
+      "platform": "x-grok",
+      "purpose": "Coordinate SAG growing-brain system: goal loops, scoreboard, ledger, digest generation",
+      "lane": "coordination",
+      "capabilities": {
+        "canRead": true,
+        "canDraft": true,
+        "canSend": false,
+        "canSpendMoney": false,
+        "canDelete": false
+      },
+      "forbiddenActions": [
+        "send-as-Devin",
+        "spending",
+        "deletion",
+        "external-API-writes",
+        "auth-changes"
+      ],
+      "monthlyCostUsd": null,
+      "authMethod": "pointer-only",
+      "authPointer": "Cursor Cloud agent run 52308083-36be-45d7-bab1-803aa84a31e5",
+      "reportsTo": "sag",
+      "status": "active",
+      "notes": "First bot entry. Reports via z-sync state updates and digest contributions. No external send authority. Budget TBD after usage observation."
+    }
+  ],
+  "updatedAt": "2026-11-08T14:00:00-05:00",
+  "updatedBy": "sag"
+}

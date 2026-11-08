@@ -1,0 +1,25 @@
+{
+  "id": "bills-on-time",
+  "name": "All bills paid on time",
+  "status": "active",
+  "target": {
+    "type": "milestone",
+    "description": "Rent (1st), Sallie Mae ~$188 (3rd), TECO electricity ~$100-130 (21st), USAA auto $100+ min paid without late fees"
+  },
+  "measurement": {
+    "current": "4 bills pending payment: Rent, Sallie Mae (student loans), USAA auto loan, TECO (electricity)",
+    "measuredAt": "2026-09-30T03:20:00-04:00",
+    "source": "bills.json",
+    "stale": true,
+    "missing": false
+  },
+  "nextAction": {
+    "description": "Next alert due for Rent ($2,200.00 on day 1)",
+    "ownerOfNextInput": "sag"
+  },
+  "loopId": null,
+  "notes": "~$82/mo total. Individual renewal days not tracked; listed for budget awareness.",
+  "createdAt": "2026-11-08T15:03:26.502Z",
+  "updatedAt": "2026-11-08T15:03:26.502Z",
+  "updatedBy": "sag"
+}

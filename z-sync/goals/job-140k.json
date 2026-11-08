@@ -1,0 +1,25 @@
+{
+  "id": "job-140k",
+  "name": "$140k+ AI/startup engineering job",
+  "status": "active",
+  "target": {
+    "type": "milestone",
+    "description": "Signed offer at $140k+ base, remote-first AI/startup engineering"
+  },
+  "measurement": {
+    "current": "10 live $140k+ roles tracked; drafts for Marker Learning/Titan; Fieldguide deadline 2026-11-30",
+    "measuredAt": "2026-11-08",
+    "source": "job-pipeline.json + user report",
+    "stale": false,
+    "missing": false
+  },
+  "nextAction": {
+    "description": "Devin to review and send Fieldguide outreach draft (closes 2026-11-30)",
+    "ownerOfNextInput": "devin"
+  },
+  "loopId": "job-pipeline",
+  "notes": "Active pipeline depth 17; rules: Remote-first AI/startup engineering; Tampa only for in-person; $80,000 salary floor; Startup-focused sources (startup.jobs and similar); Z curates lists and drafts outreach only — Devin sends; never apply or contact anyone without his explicit say-so for that action",
+  "createdAt": "2026-11-08T15:03:26.502Z",
+  "updatedAt": "2026-11-08T15:03:26.502Z",
+  "updatedBy": "sag"
+}

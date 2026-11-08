@@ -1,0 +1,27 @@
+{
+  "id": "savings-floor-20k",
+  "name": "Protected savings floor of $20k",
+  "status": "active",
+  "target": {
+    "type": "number",
+    "value": 20000,
+    "unit": "USD",
+    "description": "Total liquid savings in protected accounts (SoFi Savings + Emergency Fund + Public brokerage) never drops below $20k"
+  },
+  "measurement": {
+    "current": 3213.02,
+    "measuredAt": "2026-09-26T10:45:00-04:00",
+    "source": "finance.json (Plaid snapshot)",
+    "stale": true,
+    "missing": false
+  },
+  "nextAction": {
+    "description": "Floor at $3,213.02 / $20k - next paycheck allocation needed",
+    "ownerOfNextInput": "sag"
+  },
+  "loopId": "floor-watcher",
+  "notes": "Floor that never breaks lives in savings accounts bills never touch. ~$3.2k there now; operating money is separate.",
+  "createdAt": "2026-11-08T15:03:26.502Z",
+  "updatedAt": "2026-11-08T15:03:26.502Z",
+  "updatedBy": "sag"
+}
